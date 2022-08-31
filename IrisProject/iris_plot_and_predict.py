@@ -20,7 +20,7 @@ def get_args():
     parser.add_argument(
         "-m",
         "--model",
-        choices=["rf", "knn", "sgd", "all"],
+        choices=["rf", "knn", "sgd", "all", "none"],
         required=False,
         default="all",
         help="Optional flag to select which model to use. By default, 'all' models are used.",
@@ -80,20 +80,19 @@ def make_plots(df):
         color="class",
         title="Boxplot of all Measurements",
     )
+    box.update_yaxes(title="cm")
     box.show()
 
     violin = px.violin(
         df,
         y=[
-            "sepal length in cm",
-            "sepal width in cm",
             "petal length in cm",
-            "petal width in cm",
         ],
         color="class",
         title="Violin of all Measurements",
         points="all",
     )
+    violin.update_yaxes(title="cm")
     violin.show()
 
     heatmap = px.density_heatmap(
@@ -106,6 +105,8 @@ def make_plots(df):
         nbinsy=40,
         title="Density Heatmap of Sepal Length v. Sepal Width showing 3 distinct clusters",
     )
+    heatmap.update_yaxes(title="cm")
+    heatmap.update_xaxes(title="cm")
     heatmap.show()
 
     pie = px.pie(
@@ -127,6 +128,8 @@ def make_plots(df):
         color="class",
         title="Density Contour of Petal Length v. Petal Width showing 3 distinct clusters",
     )
+    contour.update_yaxes(title="cm")
+    contour.update_xaxes(title="cm")
     contour.show()
 
 
