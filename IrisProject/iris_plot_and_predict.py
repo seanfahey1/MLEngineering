@@ -26,6 +26,15 @@ def get_args():
         help="Optional flag to select which model to use. By default, 'all' models are used.",
     )
     parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_const",
+        const=True,
+        default=False,
+        dest="verbose",
+        help="Optional flag to enable verbose printing for predictions and probabilities.",
+    )
+    parser.add_argument(
         "-np",
         "--noplot",
         action="store_const",
@@ -36,7 +45,7 @@ def get_args():
     )
 
     args = parser.parse_args()
-    return args.model, args.plot
+    return args.model, args.plot, args.verbose
 
 
 def get_iris():
@@ -121,21 +130,20 @@ def make_plots(df):
     contour.show()
 
 
-def print_predictions(predictions, probability, y_test):
+def print_predictions(predictions, probability, y_test, verbose):
     score = sum(
         [1 if predictions[i] == y_test[i] else 0 for i in range(len(predictions))]
     )
     print(f"# correct:\t{score}/{len(predictions)}")
     print(f"accuracy:\t{score/len(predictions)}")
 
-    print("\tprediction\tprobability")
-    for i in range(len(predictions)):
-        print(f"\t{predictions[i]}\t{probability[i]}")
+    if verbose:
+        print("\tprediction\tprobability")
+        for i in range(len(predictions)):
+            print(f"\t{predictions[i]}\t{probability[i]}")
 
-    print("\n\n")
 
-
-def make_predictions(df, model):
+def make_predictions(df, model, verbose):
     # setting up data
     X = df[
         [
@@ -147,11 +155,11 @@ def make_predictions(df, model):
     ].values
     y = df["class"].values
 
-    # Using every 8th value as a test value instead of making fake data.
-    X_test = X[::8]
-    y_test = y[::8]
+    # Using every 10th value as a test value instead of making fake data.
+    X_test = X[::10]
+    y_test = y[::10]
 
-    # Setting up pipelines
+    # Building pipelines
     if model == "all" or model == "rf":
         # RF pipeline
         rf_pipeline = Pipeline(
@@ -166,7 +174,7 @@ def make_predictions(df, model):
         predictions, probability = rf_pipeline.predict(
             X_test
         ), rf_pipeline.predict_proba(X_test)
-        print_predictions(predictions, probability, y_test)
+        print_predictions(predictions, probability, y_test, verbose)
 
     if model == "all" or model == "knn":
         # KNN pipeline
@@ -182,7 +190,7 @@ def make_predictions(df, model):
         predictions, probability = knn_pipeline.predict(
             X_test
         ), knn_pipeline.predict_proba(X_test)
-        print_predictions(predictions, probability, y_test)
+        print_predictions(predictions, probability, y_test, verbose)
 
     if model == "all" or model == "sgd":
         # SGD Classifier pipeline
@@ -198,15 +206,15 @@ def make_predictions(df, model):
         predictions, probability = sgd_pipeline.predict(
             X_test
         ), sgd_pipeline.predict_proba(X_test)
-        print_predictions(predictions, probability, y_test)
+        print_predictions(predictions, probability, y_test, verbose)
 
 
 def main():
-    model, plot = get_args()
+    model, plot, verbose = get_args()
     df = get_iris()
     if plot:
         make_plots(df)
-    make_predictions(df, model)
+    make_predictions(df, model, verbose)
 
 
 if __name__ == "__main__":
