@@ -165,13 +165,14 @@ def print_predictions(predictions, probability, y_test, verbose):
     score = sum(
         [1 if predictions[i] == y_test[i] else 0 for i in range(len(predictions))]
     )
-    print(f"# correct:\t{score}/{len(predictions)}")
-    print(f"accuracy:\t{score/len(predictions)}")
+    print(f"\t# correct:\t{score}/{len(predictions)}")
+    print(f"\taccuracy:\t{round(score/len(predictions),4)*100}%")
 
     if verbose:
         print("\tprediction\tprobability")
         for i in range(len(predictions)):
             print(f"\t{predictions[i]}\t{probability[i]}")
+    print()
 
 
 def summary_stats(df):
@@ -218,7 +219,7 @@ def make_predictions(df, model, verbose):
         )
         rf_pipeline.fit(X, y)
 
-        print("---RANDOM FOREST PREDICTION---")
+        print("--- RANDOM FOREST PREDICTION ---")
         predictions, probability = rf_pipeline.predict(
             X_test
         ), rf_pipeline.predict_proba(X_test)
@@ -234,7 +235,7 @@ def make_predictions(df, model, verbose):
         )
         knn_pipeline.fit(X, y)
 
-        print("---KNN PREDICTION---")
+        print("--- KNN PREDICTION ---")
         predictions, probability = knn_pipeline.predict(
             X_test
         ), knn_pipeline.predict_proba(X_test)
@@ -250,7 +251,7 @@ def make_predictions(df, model, verbose):
         )
         sgd_pipeline.fit(X, y)
 
-        print("---SGD PREDICTION---")
+        print("--- SGD PREDICTION ---")
         predictions, probability = sgd_pipeline.predict(
             X_test
         ), sgd_pipeline.predict_proba(X_test)
