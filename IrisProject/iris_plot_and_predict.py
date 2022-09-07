@@ -6,6 +6,7 @@ This is a simple program that explores the Iris dataset by plotting various feat
 
 import argparse
 
+import numpy as np
 import pandas as pd
 import plotly.express as px
 from sklearn.ensemble import RandomForestClassifier as rfc
@@ -81,6 +82,7 @@ def make_plots(df):
         title="Boxplot of all Measurements",
     )
     box.update_yaxes(title="cm")
+    # todo: save html files for each figure but add to gitignore
     box.show()
 
     violin = px.violin(
@@ -144,6 +146,23 @@ def print_predictions(predictions, probability, y_test, verbose):
         print("\tprediction\tprobability")
         for i in range(len(predictions)):
             print(f"\t{predictions[i]}\t{probability[i]}")
+
+
+def summary_stats(df):
+    for column in [
+        "sepal length in cm",
+        "sepal width in cm",
+        "petal length in cm",
+        "petal width in cm",
+    ]:
+        print(f"--- {column} ---")
+        print(f"\tmean:\t\t{round(np.mean(df[column]),2)}")
+        print(f"\tmin:\t\t{round(np.min(df[column]),2)}")
+        print(f"\tmax:\t\t{round(np.max(df[column]),2)}")
+        print(f"\tlower quartile:\t{round(np.quantile(df[column], 0.25),2)}")
+        print(f"\tmedian:\t\t{round(np.median(df[column]),2)}")
+        print(f"\tupper quartile:\t{round(np.quantile(df[column], 0.75),2)}")
+        print("")
 
 
 def make_predictions(df, model, verbose):
@@ -215,6 +234,7 @@ def make_predictions(df, model, verbose):
 def main():
     model, plot, verbose = get_args()
     df = get_iris()
+    summary_stats(df)
     if plot:
         make_plots(df)
     make_predictions(df, model, verbose)
