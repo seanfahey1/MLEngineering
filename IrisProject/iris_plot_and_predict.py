@@ -5,6 +5,7 @@ This is a simple program that explores the Iris dataset by plotting various feat
 """
 
 import argparse
+import sys
 
 import numpy as np
 import pandas as pd
@@ -266,4 +267,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
