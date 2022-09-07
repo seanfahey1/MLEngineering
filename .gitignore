@@ -154,3 +154,5 @@ static
 scripts/update-requirements.sh
 .gitignore
 *.html
+inclass_testing/*
+pyproject.toml
