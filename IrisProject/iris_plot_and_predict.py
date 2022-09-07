@@ -181,12 +181,12 @@ def summary_stats(df):
         "petal width in cm",
     ]:
         print(f"--- {column} ---")
-        print(f"\tmean:\t\t{round(np.mean(df[column]),2)}")
         print(f"\tmin:\t\t{round(np.min(df[column]),2)}")
-        print(f"\tmax:\t\t{round(np.max(df[column]),2)}")
         print(f"\tlower quartile:\t{round(np.quantile(df[column], 0.25),2)}")
         print(f"\tmedian:\t\t{round(np.median(df[column]),2)}")
+        print(f"\tmean:\t\t{round(np.mean(df[column]),2)}")
         print(f"\tupper quartile:\t{round(np.quantile(df[column], 0.75),2)}")
+        print(f"\tmax:\t\t{round(np.max(df[column]),2)}")
         print("")
 
 
