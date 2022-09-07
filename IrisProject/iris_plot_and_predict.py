@@ -9,6 +9,7 @@ import argparse
 import numpy as np
 import pandas as pd
 import plotly.express as px
+from plotly.io import to_html
 from sklearn.ensemble import RandomForestClassifier as rfc
 from sklearn.linear_model import SGDClassifier as sgd
 from sklearn.neighbors import KNeighborsClassifier as knn
@@ -44,9 +45,18 @@ def get_args():
         dest="plot",
         help="Optional flag to disable feature plotting.",
     )
+    parser.add_argument(
+        "-ns",
+        "--nosave",
+        action="store_const",
+        const=False,
+        default=True,
+        dest="save",
+        help="Optional flag to disable saving plots.",
+    )
 
     args = parser.parse_args()
-    return args.model, args.plot, args.verbose
+    return args.model, args.plot, args.verbose, args.save
 
 
 def get_iris():
@@ -69,7 +79,13 @@ def get_iris():
     return df
 
 
-def make_plots(df):
+def save_plot(name, plot):
+    html = to_html(plot, include_plotlyjs="cdn")
+    with open(f"{name}.html", "w") as outfile:
+        outfile.write(html)
+
+
+def make_plots(df, save):
     box = px.box(
         df,
         y=[
@@ -82,8 +98,9 @@ def make_plots(df):
         title="Boxplot of all Measurements",
     )
     box.update_yaxes(title="cm")
-    # todo: save html files for each figure but add to gitignore
     box.show()
+    if save:
+        save_plot("boxplot", box)
 
     violin = px.violin(
         df,
@@ -96,6 +113,8 @@ def make_plots(df):
     )
     violin.update_yaxes(title="cm")
     violin.show()
+    if save:
+        save_plot("violin", violin)
 
     heatmap = px.density_heatmap(
         df,
@@ -110,6 +129,8 @@ def make_plots(df):
     heatmap.update_yaxes(title="cm")
     heatmap.update_xaxes(title="cm")
     heatmap.show()
+    if save:
+        save_plot("heatmap", heatmap)
 
     pie = px.pie(
         df,
@@ -118,6 +139,8 @@ def make_plots(df):
         title="Pie Chart showing % of population assigned to each class",
     )
     pie.show()
+    if save:
+        save_plot("pie", pie)
 
     contour = px.density_contour(
         df,
@@ -133,6 +156,8 @@ def make_plots(df):
     contour.update_yaxes(title="cm")
     contour.update_xaxes(title="cm")
     contour.show()
+    if save:
+        save_plot("contour", contour)
 
 
 def print_predictions(predictions, probability, y_test, verbose):
@@ -232,11 +257,11 @@ def make_predictions(df, model, verbose):
 
 
 def main():
-    model, plot, verbose = get_args()
+    model, plot, verbose, save = get_args()
     df = get_iris()
     summary_stats(df)
     if plot:
-        make_plots(df)
+        make_plots(df, save)
     make_predictions(df, model, verbose)
 
 

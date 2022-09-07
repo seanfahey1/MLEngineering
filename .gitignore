@@ -153,3 +153,4 @@ static
 # Project related ignores (place project related ignores below here)
 scripts/update-requirements.sh
 .gitignore
+*.html
