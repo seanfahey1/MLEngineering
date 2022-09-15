@@ -4,3 +4,5 @@ pandas
 plotly
 scikit-learn
 scipy
+mariadb
+sqlalchemy
