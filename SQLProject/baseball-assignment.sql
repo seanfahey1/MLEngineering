@@ -1,3 +1,11 @@
+-- cleanup tasks
+drop view if exists batter_names;
+drop table if exists career_bavg;
+drop table if exists year_bavg;
+drop table if exists per_game_stats;
+drop table if exists rolling_bavg;
+
+
 -- setting up a player name view b/c what good is any of this if we don't know the player's we're looking at
 create or replace view batter_names as
 	select 
@@ -74,16 +82,36 @@ create or replace table per_game_stats as
 ;
 
 -- get rolling average table
-select 
-	name,
-	id,
-	team,
-	teamid,
-	date,
-	sum(AB) over(order by date rows between 99 preceding and current row) as 100_game_AB,
-	sum(hits) over(order by date rows between 99 preceding and current row) as 100_game_hits,
-	avg(bavg) over(order by date rows between 99 preceding AND current row) as 100_game_avg
-FROM per_game_stats
-where name is not null
-order by id asc, date asc
+-- create or replace table rolling_bavg as
+	select 
+		p1.name,
+		p1.id,
+		p1.team,
+		p1.teamid,
+		p1.date,
+		sum(p1.AB) over(order by p1.date rows between 99 preceding and current row) as 100_game_AB,
+		sum(p1.hits) over(order by p1.date rows between 99 preceding and current row) as 100_game_hits,
+		avg(p1.bavg) over(order by p1.date rows between 99 preceding AND current row) as 100_game_avg
+	FROM per_game_stats p1
+	left join per_game_stats p2 on p1.name = p2.name 
+	where p1.name is not null
+	order by id asc, date asc
 ;
+
+-- trying again
+	select 
+		p1.name as name,
+		p1.id as id,
+		p1.team as team,
+		p1.teamid as teamid,
+		p1.date as date,
+		sum(case when datediff(p1.date, p2.date) < 100 then p2.AB else 0 end) as 100_day_ab
+-- 		sum(case when datediff(p2.date, p1.date) < 100 then p2.hits else 0 end) as 100_day_hits,
+-- 		avg(case when datediff(p2.date, p1.date) < 100 then p2.bavg else 0 end) as 100_day_bavg
+	FROM per_game_stats p1
+	left join per_game_stats p2 on p1.name = p2.name 
+	where p1.name is not null
+	group by p1.name, p1.date
+	order by p1.date desc
+;
+
