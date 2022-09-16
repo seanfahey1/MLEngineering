@@ -1,4 +1,4 @@
--- cleanup tasks
+-- startup/cleanup tasks
 drop view if exists batter_names;
 drop table if exists career_bavg;
 drop table if exists year_bavg;
@@ -6,7 +6,7 @@ drop table if exists per_game_stats;
 drop table if exists rolling_bavg;
 
 
--- setting up a player name view b/c what good is any of this if we don't know the player's we're looking at
+-- setting up a player name view b/c what good is any of this if we don't know the names of player's that we're looking at
 create or replace view batter_names as
 	select 
 		batter, 
@@ -35,7 +35,7 @@ create or replace table career_bavg
 ;
 
 
--- batting average calc per year
+-- per year batting average calculation
 create or replace table year_bavg
 	select 
 		bc.batter as id, 
@@ -57,7 +57,7 @@ create or replace table year_bavg
 	order by hits desc
 ;
 
--- rolling 100 day average
+-- rolling 100 day average: 2 step process
 -- intermediate table of player stats per game
 create or replace table per_game_stats as 
 	select 
@@ -66,11 +66,11 @@ create or replace table per_game_stats as
 		bc.team_id as teamid, 
 		t.name_brief as team,
 		g.`game_id`as game,
-		sum(bc.atBat) as AB, 
-	 	sum(bc.Hit) as hits, 
-	 	sum(bc.Walk) as walks, 
-		sum(bc.Home_Run) as HR, 
-		case when sum(bc.atBat) = 0 then 0 else sum(bc.Hit) / sum(bc.atBat) end as bavg,
+		bc.atBat as AB, 
+	 	bc.Hit as hits, 
+	 	bc.Walk as walks, 
+		bc.Home_Run as HR, 
+		case when bc.atBat = 0 then 0 else bc.Hit / bc.atBat end as bavg,
 		cast(g.local_date as date) as date
 	from batter_counts bc 
 	left join game g on g.game_id = bc.game_id
@@ -81,7 +81,7 @@ create or replace table per_game_stats as
 	order by id asc, date desc
 ;
 
--- make rolling average table
+-- 100 day rolling average calculation
 create or replace table rolling_bavg as
 	select 
 		p1.name as name,
@@ -91,15 +91,19 @@ create or replace table rolling_bavg as
 		p1.date as date,
 		/* date diff needs restrictions on both ends of range, plus case restriction to make sure the player id matches. */
 		/* haven't tested what happens when a player switches teams (id id changes or not) */
-		sum(case when datediff(p1.date, p2.date) < 100 and datediff(p1.date, p2.date) > 0 and p1.id = p2.id then p2.AB else 0 end) as 100_day_ab,
-		sum(case when datediff(p1.date, p2.date) < 100 and datediff(p1.date, p2.date) > 0 and p1.id = p2.id then p2.hits else 0 end) as 100_day_hits,
-		sum(case when datediff(p1.date, p2.date) < 100 and datediff(p1.date, p2.date) > 0 and p1.id = p2.id then p2.bavg else 0 end) as 100_day_bavg,
-		sum(case when datediff(p1.date, p2.date) < 100 and datediff(p1.date, p2.date) > 0 and p1.id = p2.id then 1 else 0 end) as num_games
+		sum(case when datediff(p1.date, p2.date) between 0 and 100 and p1.id = p2.id then p2.AB end) as 100_day_ab,
+		sum(case when datediff(p1.date, p2.date) between 0 and 100 and p1.id = p2.id then p2.hits end) as 100_day_hits,
+		sum(case when datediff(p1.date, p2.date) between 0 and 100 and p1.id = p2.id then p2.walks end) as 100_day_walks,
+		sum(case when datediff(p1.date, p2.date) between 0 and 100 and p1.id = p2.id then p2.HR end) as 100_day_HR,
+		avg(case when datediff(p1.date, p2.date) between 0 and 100 and p1.id = p2.id then p2.bavg end) as 100_day_bavg,
+		sum(case when datediff(p1.date, p2.date) between 0 and 100 and p1.id = p2.id then 1 end) as num_games
 	FROM per_game_stats p1
 	left join per_game_stats p2 on p1.name = p2.name 
-	group by p1.date, p1.id
+	group by p1.date, id
 	order by p1.id desc, p1.date asc
 ;
 
 -- test on a single player
-select * from rolling_bavg where id = "400085";
+select * from rolling_bavg 
+where id = "400085"
+;
