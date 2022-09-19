@@ -151,3 +151,8 @@ media
 static
 
 # Project related ignores (place project related ignores below here)
+scripts/update-requirements.sh
+.gitignore
+*.html
+inclass_testing/*
+pyproject.toml
