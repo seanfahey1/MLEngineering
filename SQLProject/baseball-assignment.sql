@@ -61,6 +61,7 @@ create or replace table year_bavg
 -- intermediate table of player stats per game
 create or replace table per_game_stats as 
 	select 
+		row_number() over(order by id asc) as idx,
 		bc.batter as id, 
 		bn.name, 
 		bc.team_id as teamid, 
@@ -81,6 +82,10 @@ create or replace table per_game_stats as
 	order by id asc, date desc
 ;
 
+-- add a primary key to the above table
+alter table per_game_stats add primary key (idx);
+
+
 -- 100 day rolling average calculation
 create or replace table rolling_bavg as
 	select 
@@ -91,17 +96,21 @@ create or replace table rolling_bavg as
 		p1.date as date,
 		/* date diff needs restrictions on both ends of range, plus case restriction to make sure the player id matches. */
 		/* haven't tested what happens when a player switches teams (id id changes or not) */
-		sum(case when datediff(p1.date, p2.date) between 0 and 100 and p1.id = p2.id then p2.AB end) as 100_day_ab,
-		sum(case when datediff(p1.date, p2.date) between 0 and 100 and p1.id = p2.id then p2.hit end) as 100_day_hit,
-		sum(case when datediff(p1.date, p2.date) between 0 and 100 and p1.id = p2.id then p2.walk end) as 100_day_walk,
-		sum(case when datediff(p1.date, p2.date) between 0 and 100 and p1.id = p2.id then p2.HR end) as 100_day_HR,
-		avg(case when datediff(p1.date, p2.date) between 0 and 100 and p1.id = p2.id then p2.bavg end) as 100_day_bavg,
-		sum(case when datediff(p1.date, p2.date) between 0 and 100 and p1.id = p2.id then 1 end) as num_games
+		sum(case when datediff(p1.date, p2.date) between 1 and 100 and p1.id = p2.id then p2.AB end) as 100_day_ab,
+		sum(case when datediff(p1.date, p2.date) between 1 and 100 and p1.id = p2.id then p2.hit end) as 100_day_hit,
+		sum(case when datediff(p1.date, p2.date) between 1 and 100 and p1.id = p2.id then p2.walk end) as 100_day_walk,
+		sum(case when datediff(p1.date, p2.date) between 1 and 100 and p1.id = p2.id then p2.HR end) as 100_day_HR,
+		avg(case when datediff(p1.date, p2.date) between 1 and 100 and p1.id = p2.id then p2.bavg end) as 100_day_bavg,
+		sum(case when datediff(p1.date, p2.date) between 1 and 100 and p1.id = p2.id then 1 end) as num_game
 	FROM per_game_stats p1
 	left join per_game_stats p2 on p1.name = p2.name 
 	group by p1.date, id
 	order by p1.id desc, p1.date asc
 ;
+
+-- remove null values from the table (when a player appears in a game but hasn't played a game in the 100 days prior)
+delete from rolling_bavg where num_game is null;
+
 
 -- test on a single player
 select * from rolling_bavg 
