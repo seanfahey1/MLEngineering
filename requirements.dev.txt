@@ -33,7 +33,7 @@ bleach==5.0.1
     # via nbconvert
 build==0.8.0
     # via pip-tools
-certifi==2022.6.15
+certifi==2022.6.15.2
     # via requests
 cffi==1.15.1
     # via argon2-cffi-bindings
@@ -65,9 +65,9 @@ filelock==3.8.0
     # via virtualenv
 flake8==4.0.1
     # via -r requirements.dev.in
-identify==2.5.3
+identify==2.5.5
     # via pre-commit
-idna==3.3
+idna==3.4
     # via
     #   anyio
     #   requests
@@ -77,11 +77,11 @@ importlib-metadata==4.12.0
     #   nbconvert
 importlib-resources==5.9.0
     # via jsonschema
-ipykernel==6.15.2
+ipykernel==6.15.3
     # via
     #   nbclassic
     #   notebook
-ipython==8.4.0
+ipython==8.5.0
     # via
     #   ipykernel
     #   jupyterlab
@@ -103,7 +103,7 @@ jinja2==3.1.2
     #   notebook
 json5==0.9.10
     # via jupyterlab-server
-jsonschema==4.14.0
+jsonschema==4.16.0
     # via
     #   jupyterlab-server
     #   nbformat
@@ -129,7 +129,7 @@ jupyter-server==1.18.1
     #   jupyterlab-server
     #   nbclassic
     #   notebook-shim
-jupyterlab==3.4.5
+jupyterlab==3.4.7
     # via -r requirements.dev.in
 jupyterlab-pygments==0.2.2
     # via nbconvert
@@ -153,14 +153,14 @@ mypy-extensions==0.4.3
     # via black
 nbclassic==0.4.3
     # via jupyterlab
-nbclient==0.6.7
+nbclient==0.6.8
     # via nbconvert
 nbconvert==7.0.0
     # via
     #   jupyter-server
     #   nbclassic
     #   notebook
-nbformat==5.4.0
+nbformat==5.5.0
     # via
     #   jupyter-server
     #   nbclassic
@@ -194,7 +194,7 @@ pandocfilters==1.5.0
     # via nbconvert
 parso==0.8.3
     # via jedi
-pathspec==0.9.0
+pathspec==0.10.1
     # via black
 pep517==0.13.0
     # via build
@@ -217,9 +217,9 @@ prometheus-client==0.14.1
     #   jupyter-server
     #   nbclassic
     #   notebook
-prompt-toolkit==3.0.30
+prompt-toolkit==3.0.31
     # via ipython
-psutil==5.9.1
+psutil==5.9.2
     # via ipykernel
 ptyprocess==0.7.0
     # via
@@ -270,7 +270,7 @@ six==1.16.0
     #   asttokens
     #   bleach
     #   python-dateutil
-sniffio==1.2.0
+sniffio==1.3.0
     # via anyio
 soupsieve==2.3.2.post1
     # via beautifulsoup4
@@ -289,6 +289,7 @@ tomli==2.0.1
     # via
     #   black
     #   build
+    #   jupyterlab
     #   pep517
 tornado==6.2
     # via
@@ -299,7 +300,7 @@ tornado==6.2
     #   nbclassic
     #   notebook
     #   terminado
-traitlets==5.3.0
+traitlets==5.4.0
     # via
     #   ipykernel
     #   ipython
@@ -316,7 +317,7 @@ typing-extensions==4.3.0
     # via black
 urllib3==1.26.12
     # via requests
-virtualenv==20.16.4
+virtualenv==20.16.5
     # via pre-commit
 wcwidth==0.2.5
     # via prompt-toolkit
@@ -324,7 +325,7 @@ webencodings==0.5.1
     # via
     #   bleach
     #   tinycss2
-websocket-client==1.4.0
+websocket-client==1.4.1
     # via jupyter-server
 wheel==0.37.1
     # via pip-tools
