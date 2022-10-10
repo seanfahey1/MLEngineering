@@ -1,7 +1,7 @@
 import sys
 
 import pandas as pd
-import plotly.graph_objects as go
+import plotly.express as px
 
 
 def determine_continuous(df, predictor):
@@ -17,11 +17,12 @@ def determine_continuous(df, predictor):
 
 
 def inspect_cont_pred_cont_resp(df, predictor, response):
-    fig = go.Fgure(
-        go.Scatter(
-            x=df[predictor],
-            y=df[response],
-        )
+
+    fig = px.scatter(
+        x=df[predictor],
+        y=df[response],
+        trendline="ols",
+        title=f"{predictor} v. {response} - continuous v. continuous",
     )
     fig.show()
 
@@ -32,12 +33,14 @@ def main():
         "https://raw.githubusercontent.com/jorisvandenbossche/pandas-tutorial/master/data/titanic.csv"
     )
     predictors = ["Sex", "Age", "SibSp", "Parch", "Fare", "Pclass", "Embarked"]
-    response = "Survived"
+    # response = "Survived"
+    response = "Age"
     response_continuous = determine_continuous(df, response)
 
     for predictor in predictors:
         continuous = determine_continuous(df, predictor)
-        print(response_continuous, continuous)
+        if response_continuous and continuous:
+            inspect_cont_pred_cont_resp(df, predictor, response)
 
 
 if __name__ == "__main__":
