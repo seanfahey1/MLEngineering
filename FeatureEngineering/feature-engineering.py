@@ -191,7 +191,7 @@ def weighted_mean_of_response(df, predictor, response):
     msd_value = np.mean(msd_df["MeanSquaredDiff"])
     msd_weighted_value = np.mean(msd_df["MeanSquaredDiffWeighted"])
 
-    msd_plot = plot_msd(msd_df)
+    msd_plot = plot_msd(msd_df, predictor)
 
     msd_df.loc[len(msd_df)] = (
         ["Averages"] + [""] * 6 + [str(msd_value)] + [""] + [str(msd_weighted_value)]
@@ -199,13 +199,38 @@ def weighted_mean_of_response(df, predictor, response):
     return msd_df.to_html(), msd_value, msd_weighted_value, msd_plot
 
 
-def plot_msd(df):
-    fig = go.Figure()
-    fig.add_trace(
-        go.Bar(name="counts", x=df["BinCenters"], y=df["BinCount"]),
+def plot_msd(df, predictor):
+    fig = go.Figure(
+        layout=go.Layout(
+            title="CLE vs Model",
+            yaxis2=dict(overlaying="y", side="right"),
+        )
     )
-    fig.add_trace(go.Scatter(x=df["BinCenters"], y=df["PopulationMean (𝜇𝑝𝑜𝑝)"]))
-    fig.add_trace(go.Scatter(x=df["BinCenters"], y=df["BinMeans (𝜇𝑖)"]))
+    fig.add_trace(
+        go.Bar(name="counts", x=df["BinCenters"], y=df["BinCount"], yaxis="y1"),
+    )
+    fig.add_trace(
+        go.Scatter(
+            name="𝜇𝑝𝑜𝑝", x=df["BinCenters"], y=df["PopulationMean (𝜇𝑝𝑜𝑝)"], yaxis="y2"
+        )
+    )
+    y = df["BinMeans (𝜇𝑖)"]
+    print(y)
+    fig.add_trace(
+        go.Scatter(
+            name="𝜇𝑝𝑜𝑝 - 𝜇𝑖",
+            x=df["BinCenters"],
+            y=y,
+            yaxis="y2",
+        )
+    )
+    fig.update_layout(
+        title=f"Binned difference with mean of response vs. Bin - {predictor}"
+    )
+    fig.update_layout(
+        xaxis_title="Predictor Bin", yaxis_title="Population", yaxis2_title="Response"
+    )
+    fig.update_yaxes(rangemode="tozero")
     # fig.show()
 
     return to_html(fig, include_plotlyjs="cdn")
@@ -231,11 +256,6 @@ def get_dummies(df, predictor):
 
 
 def random_forest(df, response, predictors, response_type):
-    # naughty speedup trick
-    df = df.head(20)
-    # TODO DELETE THIS!!!
-    #####
-
     if response_type == "categorical":
         rf = RandomForestClassifier(random_state=0)
     elif response_type == "continuous":
@@ -404,28 +424,34 @@ def main():
     rf_list = [rf_dict[x] for x in predictors]
     output_df.insert(6, "RF Importance", rf_list)
 
-    ll = ["asdf"] * len(output_df)
-    output_df.insert(8, "Links", ll)
-
     # make links clickable
     pwd = Path().resolve()
-    # TODO: linking works but it's all linking to the most recently run predictor plot.
-    #  Needs to link to the plot for the correct row...
-    output_df["Predictor"] = output_df["Predictor"].apply(
-        lambda x: "<a href='/{}'>{}</a>".format(
-            f"/{pwd}/output/{predictor}-feature-plot.html", x
+
+    predictor_values = []
+    dmr_values = []
+    wdmr_values = []
+    for _, row in output_df.iterrows():
+        p = row["Predictor"]
+        print(p)
+        predictor_values.append(
+            "<a href='/{}'>{}</a>".format(
+                f"/{pwd}/output/{p}-feature-plot.html", row["Predictor"]
+            )
         )
-    )
-    output_df["DMR"] = output_df["DMR"].apply(
-        lambda x: "<a href='/{}'>{}</a>".format(
-            f"/{pwd}/output/{predictor}-DMR-plot.html", x
+        dmr_values.append(
+            "<a href='/{}'>{}</a>".format(
+                f"/{pwd}/output/{p}-DMR-plot.html", row["DMR"]
+            )
         )
-    )
-    output_df["wDMR"] = output_df["wDMR"].apply(
-        lambda x: "<a href='/{}'>{}</a>".format(
-            f"/{pwd}/output/{predictor}-wDMR-table.html", x
+        wdmr_values.append(
+            "<a href='/{}'>{}</a>".format(
+                f"/{pwd}/output/{p}-wDMR-table.html", row["wDMR"]
+            )
         )
-    )
+
+    output_df["Predictor"] = predictor_values
+    output_df["DMR"] = dmr_values
+    output_df["wDMR"] = wdmr_values
 
     with open("./output/feature-comparison-table.html", "w") as out:
         out.write(
