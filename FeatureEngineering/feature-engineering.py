@@ -7,6 +7,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import statsmodels.api
+from plotly.io import to_html
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
 
@@ -38,6 +39,7 @@ def inspect_cont_pred_cont_resp(df, predictor, response, p_value, t_value):
         yaxis_title=response,
     )
     # fig.show()
+    return to_html(fig, include_plotlyjs="cdn")
 
 
 def inspect_bool_pred_cont_resp(
@@ -69,6 +71,7 @@ def inspect_bool_pred_cont_resp(
         yaxis_title=cont,
     )
     # fig.show()
+    return to_html(fig, include_plotlyjs="cdn")
 
 
 def inspect_bool_pred_bool_resp(df, predictor, response, p_value, t_value):
@@ -91,6 +94,7 @@ def inspect_bool_pred_bool_resp(df, predictor, response, p_value, t_value):
         yaxis_title=predictor,
     )
     # fig.show()
+    return to_html(fig, include_plotlyjs="cdn")
 
 
 def do_regression(df, predictor, response, method):
@@ -100,17 +104,17 @@ def do_regression(df, predictor, response, method):
     # do p and t calculations
     if method == "linear":
         pred = statsmodels.api.add_constant(df[predictor])
-        fitted_output = statsmodels.api.OLS(df[response], pred).fit()
+        fitted_output = statsmodels.api.OLS(df[response], pred).fit(disp=0)
         t_value = round(fitted_output.tvalues[1], 6)
         p_value = "{:.6e}".format(fitted_output.pvalues[1])
 
     elif method == "logistic":
-        fitted_output = statsmodels.api.Logit(df[predictor], df[response]).fit()
+        fitted_output = statsmodels.api.Logit(df[predictor], df[response]).fit(disp=0)
         t_value = round(fitted_output.tvalues[0], 6)
         p_value = "{:.6e}".format(fitted_output.pvalues[0])
 
     elif method == "logistic-reversed":
-        fitted_output = statsmodels.api.Logit(df[response], df[predictor]).fit()
+        fitted_output = statsmodels.api.Logit(df[response], df[predictor]).fit(disp=0)
         t_value = round(fitted_output.tvalues[0], 6)
         p_value = "{:.6e}".format(fitted_output.pvalues[0])
 
@@ -187,9 +191,12 @@ def weighted_mean_of_response(df, predictor, response):
     msd_value = np.mean(msd_df["MeanSquaredDiff"])
     msd_weighted_value = np.mean(msd_df["MeanSquaredDiffWeighted"])
 
-    plot_msd(msd_df)
+    msd_plot = plot_msd(msd_df)
 
-    return msd_df.to_html(), msd_value, msd_weighted_value
+    msd_df.loc[len(msd_df)] = (
+        ["Averages"] + [""] * 6 + [str(msd_value)] + [""] + [str(msd_weighted_value)]
+    )
+    return msd_df.to_html(), msd_value, msd_weighted_value, msd_plot
 
 
 def plot_msd(df):
@@ -201,7 +208,7 @@ def plot_msd(df):
     fig.add_trace(go.Scatter(x=df["BinCenters"], y=df["BinMeans (𝜇𝑖)"]))
     # fig.show()
 
-    return
+    return to_html(fig, include_plotlyjs="cdn")
 
 
 def get_dummies(df, predictor):
@@ -223,18 +230,32 @@ def get_dummies(df, predictor):
     return df, False
 
 
-def random_forest(df, predictor, response, response_type):
+def random_forest(df, response, predictors, response_type):
+    # naughty speedup trick
+    df = df.head(20)
+    # TODO DELETE THIS!!!
+    #####
+
     if response_type == "categorical":
         rf = RandomForestClassifier(random_state=0)
     elif response_type == "continuous":
         rf = RandomForestRegressor(random_state=0)
     else:
-        raise ValueError("unsupported response type input")
-    df = df[[predictor, response]].dropna()
-    X = df[predictor].to_numpy().reshape(-1, 1)
+        raise ValueError("invalid response type")
+
+    relevant_columns = [response] + predictors
+    df = df[relevant_columns].dropna()
+    X = df[predictors].to_numpy()
+
+    if X.shape[1] == 1:
+        X = X.reshape(-1, 1)
     y = df[response].to_numpy().reshape(-1, 1).ravel()
     rf.fit(X, y)
-    print(rf.feature_importances_)
+    return list(rf.feature_importances_)
+
+
+def make_clickable(val, link):
+    return '<a href="{}">{}</a>'.format(link, val)
 
 
 def dataset_insert():
@@ -247,8 +268,9 @@ def dataset_insert():
     df["test1"] = [random.choice([True, False]) for i in range(len(df))]
     df["test2"] = [random.choice([0, 1]) for i in range(len(df))]
     df["test3"] = [random.choice([x for x in range(100)]) for i in range(len(df))]
-    predictors = ["Age", "test1", "test2", "test3", "Sex"]
-    response = "Survived"
+    predictors = ["Age", "test1", "test2", "test3", "Sex", "Survived", "Fare"]
+    response = "test1"
+    predictors = [x for x in predictors if x != response]
     # response = "Fare"
     return df, predictors, response
 
@@ -268,13 +290,16 @@ def main():
             "Predictor",
             "Response Type",
             "Predictor Type",
-            "RF Importance",
             "p-value",
             "t-value",
             "DMR",
             "wDMR",
         ]
     )
+
+    Path("./output").mkdir(exist_ok=True)
+
+    continuous_predictors = []
 
     # loop through each predictor and generate the correct plot
     for predictor in predictors:
@@ -285,6 +310,8 @@ def main():
 
         if not predictor_continuous:
             df, modified = get_dummies(df, predictor)
+        else:
+            continuous_predictors.append(predictor)
 
         # use cat/cont info to determine which functions to call
         if response_continuous:
@@ -292,17 +319,21 @@ def main():
                 p_value, t_value = do_regression(
                     df, predictor, response, method="linear"
                 )
-                rf = random_forest(df, predictor, response, "continuous")
-                inspect_cont_pred_cont_resp(df, predictor, response, p_value, t_value)
-                msd_html, dmr, wdmr = weighted_mean_of_response(df, predictor, response)
+                plot = inspect_cont_pred_cont_resp(
+                    df, predictor, response, p_value, t_value
+                )
+                msd_html, dmr, wdmr, msd_plot = weighted_mean_of_response(
+                    df, predictor, response
+                )
             else:
                 modified_predictor = f"bool_{predictor}" if modified else predictor
                 p_value, t_value = do_regression(
                     df, modified_predictor, response, method="logistic"
                 )
-                rf = None
-                inspect_bool_pred_cont_resp(df, predictor, response, p_value, t_value)
-                msd_html, dmr, wdmr = weighted_mean_of_response(
+                plot = inspect_bool_pred_cont_resp(
+                    df, predictor, response, p_value, t_value
+                )
+                msd_html, dmr, wdmr, msd_plot = weighted_mean_of_response(
                     df, modified_predictor, response
                 )
         else:
@@ -313,8 +344,7 @@ def main():
                 p_value, t_value = do_regression(
                     df, predictor, modified_response, method="logistic-reversed"
                 )
-                rf = random_forest(df, predictor, response, "continuous")
-                inspect_bool_pred_cont_resp(
+                plot = inspect_bool_pred_cont_resp(
                     df,
                     predictor,
                     response,
@@ -322,7 +352,7 @@ def main():
                     t_value,
                     reverse=True,
                 )
-                msd_html, dmr, wdmr = weighted_mean_of_response(
+                msd_html, dmr, wdmr, msd_plot = weighted_mean_of_response(
                     df, predictor, modified_response
                 )
             else:
@@ -333,17 +363,18 @@ def main():
                 p_value, t_value = do_regression(
                     df, modified_predictor, modified_response, method="logistic"
                 )
-                rf = None
-                inspect_bool_pred_bool_resp(df, predictor, response, p_value, t_value)
-                msd_html, dmr, wdmr = weighted_mean_of_response(
+                plot = inspect_bool_pred_bool_resp(
+                    df, predictor, response, p_value, t_value
+                )
+                msd_html, dmr, wdmr, msd_plot = weighted_mean_of_response(
                     df, modified_predictor, modified_response
                 )
+
         line = [
             response,
             predictor,
             "Continuous" if response_continuous else "Categorical",
             "Continuous" if predictor_continuous else "Categorical",
-            rf,
             p_value,
             t_value,
             dmr,
@@ -351,9 +382,60 @@ def main():
         ]
         output_df.loc[len(output_df)] = line
 
-    # save outputs
-    Path("./output").mkdir(exist_ok=True)
-    print(output_df)
+        # save outputs
+        with open(f"./output/{predictor}-wDMR-table.html", "w") as out:
+            out.write(msd_html)
+        with open(f"./output/{predictor}-DMR-plot.html", "w") as out:
+            out.write(msd_plot)
+        with open(f"./output/{predictor}-feature-plot.html", "w") as out:
+            out.write(plot)
+
+    # random forest feature importance calculations
+    rf_results = random_forest(
+        df,
+        response,
+        continuous_predictors,
+        "continuous" if response_continuous else "categorical",
+    )
+    rf_dict = {continuous_predictors[i]: rf_results[i] for i in range(len(rf_results))}
+    for predictor in predictors:
+        if predictor not in rf_dict.keys():
+            rf_dict[predictor] = None
+    rf_list = [rf_dict[x] for x in predictors]
+    output_df.insert(6, "RF Importance", rf_list)
+
+    ll = ["asdf"] * len(output_df)
+    output_df.insert(8, "Links", ll)
+
+    # make links clickable
+    pwd = Path().resolve()
+    # TODO: linking works but it's all linking to the most recently run predictor plot.
+    #  Needs to link to the plot for the correct row...
+    output_df["Predictor"] = output_df["Predictor"].apply(
+        lambda x: "<a href='/{}'>{}</a>".format(
+            f"/{pwd}/output/{predictor}-feature-plot.html", x
+        )
+    )
+    output_df["DMR"] = output_df["DMR"].apply(
+        lambda x: "<a href='/{}'>{}</a>".format(
+            f"/{pwd}/output/{predictor}-DMR-plot.html", x
+        )
+    )
+    output_df["wDMR"] = output_df["wDMR"].apply(
+        lambda x: "<a href='/{}'>{}</a>".format(
+            f"/{pwd}/output/{predictor}-wDMR-table.html", x
+        )
+    )
+
+    with open("./output/feature-comparison-table.html", "w") as out:
+        out.write(
+            output_df.to_html(
+                index=False,
+                na_rep="None",
+                render_links=True,
+                escape=False,
+            )
+        )
 
 
 if __name__ == "__main__":
