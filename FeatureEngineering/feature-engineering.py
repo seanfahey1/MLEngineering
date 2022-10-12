@@ -1,8 +1,10 @@
 import random
 import sys
 
+import numpy as np
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import statsmodels.api
 
 debug = True
@@ -49,7 +51,7 @@ def inspect_bool_pred_cont_resp(df, predictor, response, reverse=False):
     True.
     """
     if debug:
-        pass
+        return
 
     if reverse:
         cat = response
@@ -130,6 +132,78 @@ def do_regression(df, predictor, response, method):
     return p_value, t_value
 
 
+def weighted_mean_of_response(df, predictor, response):
+    msd_df = pd.DataFrame(
+        columns=[
+            "(𝑖)",
+            "LowerBin",
+            "UpperBin",
+            "BinCenters",
+            "BinCount",
+            "BinMeans (𝜇𝑖)",
+            "PopulationMean (𝜇𝑝𝑜𝑝)",
+            "MeanSquaredDiff",
+        ]
+    )
+
+    # get rid of NaN values and sort the dataframe
+    df = df[[predictor, response]].dropna()
+    df = df.sort_values(by=predictor, ascending=True).reset_index(drop=True)
+
+    # figure out number of samples to use per bin
+    bin_step_sizes = [((df[predictor].max() - df[predictor].min()) / 10)] * 9 + [np.inf]
+
+    # calculate mean response per bin, bin predictor min, bin predictor max
+    previous_bin_max = min(df[predictor])
+    pop_mean_response = np.mean(df[response])
+
+    for i, bin_step_size in enumerate(bin_step_sizes):
+        bin_df = df[
+            (df[predictor] >= previous_bin_max)
+            & (df[predictor] < previous_bin_max + bin_step_size)
+        ]
+        bin_count = len(bin_df)
+
+        if bin_count > 0:
+            bin_min = min(bin_df[predictor])
+            bin_max = max(bin_df[predictor])
+            bin_center = (bin_max - bin_min) / 2 + bin_min
+            mean_response = np.mean(bin_df[response])
+            msd = (mean_response - pop_mean_response) ** 2 / bin_count
+        else:
+            bin_min = previous_bin_max
+            bin_max = previous_bin_max + bin_step_size
+            bin_center = (previous_bin_max + bin_step_size) / 2 + previous_bin_max
+            mean_response = None
+            msd = None
+
+        msd_df.loc[len(msd_df)] = [
+            str(int(i)),
+            bin_min,
+            bin_max,
+            bin_center,
+            bin_count,
+            mean_response,
+            pop_mean_response,
+            msd,
+        ]
+        previous_bin_max = bin_max
+    plot_msd(msd_df)
+    return msd_df
+
+
+def plot_msd(df):
+    fig = go.Figure()
+    fig.add_trace(
+        go.Bar(name="counts", x=df["BinCenters"], y=df["BinCount"]),
+    )
+    fig.add_trace(go.Scatter(x=df["BinCenters"], y=df["PopulationMean (𝜇𝑝𝑜𝑝)"]))
+    fig.add_trace(go.Scatter(x=df["BinCenters"], y=df["BinMeans (𝜇𝑖)"]))
+    fig.show()
+
+    return
+
+
 def dataset_insert():
     """
     Function to easily drop in different csv formatted datasets and lists of predictor and response columns to use.
@@ -139,9 +213,10 @@ def dataset_insert():
     )
     df["test1"] = [random.choice([True, False]) for i in range(len(df))]
     df["test2"] = [random.choice([0, 1]) for i in range(len(df))]
-    predictors = ["Sex", "Age", "SibSp", "Parch", "Fare", "Pclass", "test1", "test2"]
-    response = "Survived"
-    # response = "Fare"
+    df["test3"] = [random.choice([x for x in range(100)]) for i in range(len(df))]
+    predictors = ["Sex", "Age", "test1", "test2", "test3"]
+    # response = "Survived"
+    response = "Fare"
     return df, predictors, response
 
 
@@ -158,9 +233,11 @@ def main():
         predictor_continuous = determine_continuous(df, predictor)
         cont_lookup[predictor] = predictor_continuous
 
-        # use cat/cont info to determine which plotting function to use
+        # use cat/cont info to determine which functions to call
         if response_continuous and predictor_continuous:
             inspect_cont_pred_cont_resp(df, predictor, response)
+            weighted_mean_of_response(df, predictor, response)
+
         elif response_continuous and not predictor_continuous:
             inspect_bool_pred_cont_resp(df, predictor, response)
         elif not response_continuous and predictor_continuous:
