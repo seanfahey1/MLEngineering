@@ -11,21 +11,10 @@ import statsmodels.api
 from cat_correlation import cat_cont_correlation_ratio, cat_correlation
 from plotly.io import to_html
 from scipy import stats
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
 
-def cat_cat_correlation_metrics(df, col1, col2):
-    pass
-
-
-def cat_cont_correlation_metrics(df, col1, col2):
-    pass
-
-
-def cont_cont_correlation_metrics(df, col1, col2):
-    pass
-
-
-def difference_w_mean_of_resp_1d(df, predictor, response):
+def difference_w_mean_of_resp_1d(df, predictor, response, out_dir):
     # returns DMR, wDMR, plot html
     msd_df = pd.DataFrame(
         columns=[
@@ -46,7 +35,6 @@ def difference_w_mean_of_resp_1d(df, predictor, response):
 
     # figure out number of samples to use per bin
     bin_step_sizes = [((df[predictor].max() - df[predictor].min()) / 10)] * 9 + [np.inf]
-
     # calculate mean response per bin, bin predictor min, bin predictor max
     previous_bin_max = min(df[predictor])
     pop_mean_response = np.mean(df[response])
@@ -59,15 +47,14 @@ def difference_w_mean_of_resp_1d(df, predictor, response):
         ]
         bin_count = len(bin_df)
         pop_porp = bin_count / len(df)
-
         # assign values to bin
         if bin_count > 0:
             bin_min = min(bin_df[predictor])
             bin_max = max(bin_df[predictor])
-            bin_center = (bin_max - bin_min) / 2 + bin_min
+            bin_center = (previous_bin_max + bin_step_size) / 2 + previous_bin_max
             mean_response = np.mean(bin_df[response])
             msd = (mean_response - pop_mean_response) ** 2 / bin_count
-            msd_weighted = msd / pop_porp
+            msd_weighted = msd * pop_porp
 
         else:
             bin_min = previous_bin_max
@@ -90,14 +77,19 @@ def difference_w_mean_of_resp_1d(df, predictor, response):
             pop_porp,
             msd_weighted,
         ]
-        previous_bin_max = bin_max
+        previous_bin_max += bin_step_size
 
     msd_value = np.mean(msd_df["MeanSquaredDiff"])
     msd_weighted_value = np.mean(msd_df["MeanSquaredDiffWeighted"])
 
     msd_plot = plot_msd(msd_df, predictor)
 
-    return msd_df.to_html(), msd_value, msd_weighted_value, msd_plot
+    with open(
+        out_dir / f"msd plot {predictor} v. response ({response}).html", "w"
+    ) as outfile:
+        outfile.write(msd_plot)
+
+    return msd_df, msd_value, msd_weighted_value
 
 
 def plot_msd(df, predictor):
@@ -115,37 +107,24 @@ def plot_msd(df, predictor):
             name="𝜇𝑝𝑜𝑝", x=df["BinCenters"], y=df["PopulationMean (𝜇𝑝𝑜𝑝)"], yaxis="y2"
         )
     )
-    y = df["BinMeans (𝜇𝑖)"]
     fig.add_trace(
         go.Scatter(
             name="𝜇𝑝𝑜𝑝 - 𝜇𝑖",
             x=df["BinCenters"],
-            y=y,
+            y=df["BinMeans (𝜇𝑖)"],
             yaxis="y2",
         )
     )
+    fig.update_layout(title=f"difference with mean of response - {predictor}")
     fig.update_layout(
-        title=f"Binned difference with mean of response vs. Bin - {predictor}"
-    )
-    fig.update_layout(
-        xaxis_title="Predictor Bin", yaxis_title="Population", yaxis2_title="Response"
+        xaxis_title=f"{predictor} bin",
+        yaxis_title="Population",
+        yaxis2_title="Response",
     )
     fig.update_yaxes(rangemode="tozero")
     # fig.show()
 
     return to_html(fig, include_plotlyjs="cdn")
-
-
-def brute_force_cat_cat():
-    pass
-
-
-def brute_force_cat_cont():
-    pass
-
-
-def brute_force_cont_cont():
-    pass
 
 
 def dmr_2d_cat_cat(df, catpred1, catpred2, response, output_dir):
@@ -482,6 +461,86 @@ def plot_cont_cont(df, column1, column2, output_dir):
         out.write(to_html(fig, include_plotlyjs="cdn"))
 
 
+def plot_cont_pred_cont_resp(df, predictor, response, out_dir):
+    fig = px.scatter(
+        x=df[predictor],
+        y=df[response],
+        trendline="ols",
+        title=f"<b>{predictor} v. {response}</b><br>continuous v. continuous<br>",
+    )
+    fig.update_layout(
+        xaxis_title=predictor,
+        yaxis_title=response,
+    )
+    # fig.show()
+
+    with open(out_dir / f"{predictor} v. response.html", "w") as out:
+        out.write(to_html(fig, include_plotlyjs="cdn"))
+
+    return
+
+
+def plot_cat_pred_cont_resp(df, predictor, response, out_dir):
+    fig = px.violin(
+        color=df[predictor],
+        y=df[response],
+        points="all",
+        box=True,
+        title=f"<b>{predictor} v. {response}</b>",
+    )
+    fig.update_layout(
+        xaxis_title=predictor,
+        yaxis_title=response,
+    )
+    # fig.show()
+
+    with open(out_dir / f"{predictor} v. response.html", "w") as out:
+        out.write(to_html(fig, include_plotlyjs="cdn"))
+
+    return
+
+
+def plot_cont_pred_cat_resp(df, predictor, response, out_dir):
+    fig = px.violin(
+        color=df[response],
+        y=df[predictor],
+        points="all",
+        box=True,
+        title=f"<b>{response} v. {predictor}</b>",
+    )
+    fig.update_layout(
+        xaxis_title=response,
+        yaxis_title=predictor,
+    )
+    # fig.show()
+
+    with open(out_dir / f"{predictor} v. response.html", "w") as out:
+        out.write(to_html(fig, include_plotlyjs="cdn"))
+
+    return
+
+
+def plot_cat_pred_cat_resp(df, predictor, response, out_dir):
+    count_df = (
+        df[[predictor, response]]
+        .value_counts()
+        .reset_index()
+        .pivot(index=predictor, columns=response, values=0)
+    )
+    fig = px.imshow(count_df)
+    fig.update_layout(
+        title=f"<b>{predictor} v. {response}</b>",
+        xaxis_title=response,
+        yaxis_title=predictor,
+    )
+    # fig.show()
+
+    with open(out_dir / f"{predictor} v. response.html", "w") as out:
+        out.write(to_html(fig, include_plotlyjs="cdn"))
+
+    return
+
+
 def determine_cat_cont(df, predictors, response):
     class FoundCategorical(Exception):
         pass
@@ -516,8 +575,8 @@ def dataset_insert_data():
     """
     df = pd.read_csv("/Users/sean/workspace/Sean/sdsu/BDA602/heart disease data.csv")
 
-    # response = "age"
-    response = "Heart Disease"
+    response = "age"
+    # response = "Heart Disease"
     predictors = [
         "age",
         "sex",
@@ -545,16 +604,50 @@ def linear_regression(df, predictor, response):
     return p_value, t_value, res.rvalue
 
 
+def response_regression(df, predictor, response, response_cat):
+    # drop any NaN values
+    df = df[[predictor, response]].dropna()
+
+    if response_cat:
+        fitted_output = statsmodels.api.Logit(df[predictor], df[response]).fit(disp=0)
+        t_value = round(fitted_output.tvalues[0], 6)
+        p_value = "{:.6e}".format(fitted_output.pvalues[0])
+    else:
+        pred = statsmodels.api.add_constant(df[predictor])
+        fitted_output = statsmodels.api.OLS(df[response], pred).fit(disp=0)
+        t_value = round(fitted_output.tvalues[1], 6)
+        p_value = "{:.6e}".format(fitted_output.pvalues[1])
+    return p_value, t_value
+
+
+def random_forest(df, response, predictors, response_type):
+    if response_type == "categorical":
+        rf = RandomForestClassifier(random_state=0)
+    elif response_type == "continuous":
+        rf = RandomForestRegressor(random_state=0)
+    else:
+        raise ValueError("invalid response type")
+
+    relevant_columns = [response] + predictors
+    df = df[relevant_columns].dropna()
+    X = df[predictors].to_numpy()
+
+    if X.shape[1] == 1:
+        X = X.reshape(-1, 1)
+    y = df[response].to_numpy().reshape(-1, 1).ravel()
+    rf.fit(X, y)
+    return list(rf.feature_importances_)
+
+
 def main():
     # setup output directory
     cwd = pathlib.Path(__file__).parent.resolve()
     output_dir = cwd / "output"
     pathlib.Path(output_dir).mkdir(exist_ok=True)
 
+    # PREDICTOR V. PREDICTOR CORRELATIONS
     # setup empty html files to build onto
-    html_predictor_comparison_table_output_file = (
-        f"{output_dir}/predictor-comparison-tables.html"
-    )
+    html_predictor_comparison_table_output_file = f"{output_dir}/comparison-tables.html"
     with open(html_predictor_comparison_table_output_file, "w") as out:
         out.write("")
 
@@ -638,8 +731,9 @@ def main():
 
     # write html table outputs
     with open(html_predictor_comparison_table_output_file, "a") as out:
+        out.write("<b><h1>Predictor v. Predictor Comparisons</h1></b>")
         out.write("<h1>Categorical-Categorical Predictor Comparisons</h1>")
-        out.write("<h3>Weighted Difference of Mean Response")
+        out.write("<h3>Weighted Difference of Mean Response</h3>")
         out.write(
             brute_force_table_cat_cat.to_html(
                 index=False,
@@ -648,7 +742,7 @@ def main():
                 escape=False,
             )
         )
-        out.write("<br>Correlation Heat Plots")
+        out.write("<br><h3>Correlation Heat Plots</h3>")
         out.write(
             correlation_table_cat_cat.to_html(
                 index=False,
@@ -736,7 +830,7 @@ def main():
     # write html table outputs
     with open(html_predictor_comparison_table_output_file, "a") as out:
         out.write("<br><br><h1>Categorical-Continuous Predictor Comparisons</h1>")
-        out.write("<h3>Weighted Difference of Mean Response")
+        out.write("<h3>Weighted Difference of Mean Response</h3>")
         out.write(
             brute_force_table_cat_cont.to_html(
                 index=False,
@@ -745,7 +839,7 @@ def main():
                 escape=False,
             )
         )
-        out.write("<br>Correlation Violin Plots")
+        out.write("<br><h3>Correlation Violin Plots</h3>")
         out.write(
             correlation_table_cat_cont.to_html(
                 index=False,
@@ -836,7 +930,7 @@ def main():
     # write html table outputs
     with open(html_predictor_comparison_table_output_file, "a") as out:
         out.write("<br><br><h1>Continuous-Continuous Predictor Comparisons</h1>")
-        out.write("<h3>Weighted Difference of Mean Response")
+        out.write("<h3>Weighted Difference of Mean Response</h3>")
         out.write(
             brute_force_table_cont_cont.to_html(
                 index=False,
@@ -845,7 +939,7 @@ def main():
                 escape=False,
             )
         )
-        out.write("<br>Correlation Scatter Plots")
+        out.write("<br><h3>Correlation Scatter Plots</h3>")
         out.write(
             correlation_table_cont_cont.to_html(
                 index=False,
@@ -856,6 +950,70 @@ def main():
         )
         out.write("<br>")
         out.write(to_html(cont_cont_correlation_plot, include_plotlyjs="cdn"))
+
+    # PREDICTOR V. RESPONSE CORRELATIONS
+    output_df = pd.DataFrame(
+        columns=[
+            "Response",
+            "Predictor",
+            "Response Type",
+            "Predictor Type",
+            "min",
+            "max",
+            "median",
+            "p-value",
+            "t-value",
+            "RF importance",
+            "DMR",
+            "wDMR",
+            "link to DMR plot",
+            "link to predictor plot",
+        ]
+    )
+
+    feature_importances = random_forest(
+        df, response, cont_predictors, "categorical" if response_cat else "continuous"
+    )
+    for i, predictor in enumerate(cont_predictors):
+        if response_cat:
+            plot_cont_pred_cat_resp(df, predictor, response, output_dir)
+        else:
+            plot_cont_pred_cont_resp(df, predictor, response, output_dir)
+
+        p_value, t_value = response_regression(df, predictor, response, response_cat)
+        msd_df, dmr, wdmr = difference_w_mean_of_resp_1d(
+            df, predictor, response, output_dir
+        )
+
+        output_df.loc[len(output_df)] = [
+            response,
+            predictor,
+            "categorical" if response_cat else "continuous",
+            "continuous",
+            min(df[predictor]),
+            max(df[predictor]),
+            np.median(df[predictor]),
+            p_value,
+            t_value,
+            feature_importances[i],
+            dmr,
+            wdmr,
+            f"<a href='//{output_dir}/msd plot {predictor} v. response ({response}).html'>DMR - {predictor}</a>",  # noqa: E501
+            f"<a href='//{output_dir}/{predictor} v. response.html'>{predictor} v. response</a>",  # noqa: E501
+        ]
+
+    output_df.sort_values(by="wDMR", ascending=False, inplace=True)
+    with open(html_predictor_comparison_table_output_file, "a") as out:
+        out.write("<b><h1>Predictor v. Response Comparisons</h1></b>")
+        out.write("<h3>Weighted Difference of Mean Response Table</h3>")
+        out.write(
+            output_df.to_html(
+                index=False,
+                na_rep="None",
+                render_links=True,
+                escape=False,
+            )
+        )
 
 
 if __name__ == "__main__":
