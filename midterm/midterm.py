@@ -7,7 +7,10 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import statsmodels.api
+from cat_correlation import cat_cont_correlation_ratio, cat_correlation
 from plotly.io import to_html
+from scipy import stats
 
 
 def cat_cat_correlation_metrics(df, col1, col2):
@@ -343,17 +346,17 @@ def dmr_2d_cont_cont(df, contpred1, contpred2, response, output_dir):
     wdmr_list = []
 
     pred_1_previous_bin_max = min(df[contpred1])
-    for row, bin_step_size in enumerate(pred_1_bin_step_sizes):
+    for row, pred_1_bin_step_size in enumerate(pred_1_bin_step_sizes):
         pred_2_previous_bin_max = min(df[contpred2])
-        for col, bin_step_size in enumerate(pred_2_bin_step_sizes):
+        for col, pred_2_bin_step_size in enumerate(pred_2_bin_step_sizes):
             bin = df[
                 (df[contpred1] >= pred_1_previous_bin_max)
-                & (df[contpred1] < pred_1_previous_bin_max + bin_step_size)
+                & (df[contpred1] < pred_1_previous_bin_max + pred_1_bin_step_size)
             ]
 
             bin = bin[
                 (bin[contpred2] >= pred_2_previous_bin_max)
-                & (bin[contpred2] < pred_2_previous_bin_max + bin_step_size)
+                & (bin[contpred2] < pred_2_previous_bin_max + pred_2_bin_step_size)
             ]
 
             bin_size = len(bin)
@@ -372,8 +375,8 @@ def dmr_2d_cont_cont(df, contpred1, contpred2, response, output_dir):
             wdmr_list.append(wdmr)
             avg_resp_array[row][col] = bin_mean_resp
             pop_size_array[row][col] = pop_porp
-            pred_2_previous_bin_max = pred_2_previous_bin_max + bin_step_size
-        pred_1_previous_bin_max = pred_1_previous_bin_max + bin_step_size
+            pred_2_previous_bin_max = pred_2_previous_bin_max + pred_2_bin_step_size
+        pred_1_previous_bin_max = pred_1_previous_bin_max + pred_1_bin_step_size
 
     avg_dmr = np.mean([x for x in dmr_list if x is not None])
     avg_wdmr = np.mean([x for x in wdmr_list if x is not None])
@@ -417,6 +420,66 @@ def dmr_2d_cont_cont(df, contpred1, contpred2, response, output_dir):
     # avg_resp_fig.show()
     # pop_size_fig.show()
     return avg_dmr, avg_wdmr
+
+
+def plot_cat_cat(df, column1, column2, output_dir):
+    count_df = (
+        df[[column1, column2]]
+        .value_counts()
+        .reset_index()
+        .pivot(index=column1, columns=column2, values=0)
+    )
+    fig = px.imshow(count_df)
+    fig.update_layout(
+        title=f"<b>{column1} v. {column2}</b><br>categorical v. categorical<br>",
+        xaxis_title=column1,
+        yaxis_title=column2,
+    )
+    with open(
+        output_dir
+        / f"predictor v. predictor correlation plot - {column1} v. {column2}.html",
+        "w",
+    ) as out:
+        out.write(to_html(fig, include_plotlyjs="cdn"))
+
+
+def plot_cat_cont(df, cat_col, cont_col, output_dir):
+    fig = px.violin(
+        color=df[cat_col],
+        y=df[cont_col],
+        points="all",
+        box=True,
+    )
+    fig.update_layout(
+        title=f"<b>{cat_col} v. {cont_col}</b><br>categorical v. continuous",
+        xaxis_title=cat_col,
+        yaxis_title=cont_col,
+    )
+    with open(
+        output_dir
+        / f"predictor v. predictor correlation plot - {cat_col} v. {cont_col}.html",
+        "w",
+    ) as out:
+        out.write(to_html(fig, include_plotlyjs="cdn"))
+
+
+def plot_cont_cont(df, column1, column2, output_dir):
+    fig = px.scatter(
+        x=df[column1],
+        y=df[column2],
+        trendline="ols",
+    )
+    fig.update_layout(
+        title=f"<b>{column1} v. {column2}</b><br>continuous v. continuous<br>",
+        xaxis_title=column1,
+        yaxis_title=column2,
+    )
+    with open(
+        output_dir
+        / f"predictor v. predictor correlation plot - {column1} v. {column2}.html",
+        "w",
+    ) as out:
+        out.write(to_html(fig, include_plotlyjs="cdn"))
 
 
 def determine_cat_cont(df, predictors, response):
@@ -472,18 +535,36 @@ def dataset_insert_data():
     return df, predictors, response
 
 
+def linear_regression(df, predictor, response):
+    pred = statsmodels.api.add_constant(df[predictor])
+    fitted_output = statsmodels.api.OLS(df[response], pred).fit(disp=0)
+    t_value = round(fitted_output.tvalues[1], 6)
+    p_value = "{:.6e}".format(fitted_output.pvalues[1])
+    res = stats.linregress(df[predictor], df[response])
+
+    return p_value, t_value, res.rvalue
+
+
 def main():
     # setup output directory
     cwd = pathlib.Path(__file__).parent.resolve()
     output_dir = cwd / "output"
     pathlib.Path(output_dir).mkdir(exist_ok=True)
 
+    # setup empty html files to build onto
+    html_predictor_comparison_table_output_file = (
+        f"{output_dir}/predictor-comparison-tables.html"
+    )
+    with open(html_predictor_comparison_table_output_file, "w") as out:
+        out.write("")
+
     df, predictors, response = dataset_insert_data()
     cat_predictors, cont_predictors, response_cat = determine_cat_cont(
         df, predictors, response
     )
 
-    # compare all categorical predictors to all other categorical predictors
+    # categorical v. categorical predictors
+    # set up empty dfs to store outputs
     brute_force_table_cat_cat = pd.DataFrame(
         columns=[
             "predictor 1",
@@ -496,7 +577,32 @@ def main():
             "Average Response Plot",
         ]
     )
+    correlation_table_cat_cat = pd.DataFrame(
+        columns=[
+            "predictor 1",
+            "predictor 2",
+            "predictor 1 type",
+            "predictor 2 type",
+            "correlation ratio (Cramer's V)",
+            "absolute value of corr ratio",
+            "link to heat plot",
+        ]
+    )
+    # get all pairwise unique combinations of categorical predictors
     for catpred1, catpred2 in itertools.combinations(cat_predictors, 2):
+        # cat v. cat correlation ratio
+        corr = cat_correlation(df[catpred1], df[catpred2])
+        plot_cat_cat(df, catpred1, catpred2, output_dir)
+        correlation_table_cat_cat.loc[len(correlation_table_cat_cat)] = [
+            catpred1,
+            catpred2,
+            "categorical",
+            "categorical",
+            corr,
+            abs(corr),
+            f"<a href='//{output_dir}/predictor v. predictor correlation plot - {catpred1} v. {catpred2}.html'>correlation plot - {catpred1} v. {catpred2}</a>",  # noqa: E501
+        ]
+        # cat v. cat wDMR
         dmr, wdmr = dmr_2d_cat_cat(df, catpred1, catpred2, response, output_dir)
         brute_force_table_cat_cat.loc[len(brute_force_table_cat_cat)] = [
             catpred1,
@@ -512,7 +618,14 @@ def main():
     brute_force_table_cat_cat.sort_values(
         by="Weighted DMR", ascending=False, inplace=True
     )
-    with open(f"{output_dir}/cat-cat-brute-force-comparison-table.html", "w") as out:
+    correlation_table_cat_cat.sort_values(
+        by="correlation ratio (Cramer's V)", ascending=False, inplace=True
+    )
+
+    # write html table outputs
+    with open(html_predictor_comparison_table_output_file, "a") as out:
+        out.write("<h1>Categorical-Categorical Predictor Comparisons</h1>")
+        out.write("<h3>Weighted Difference of Mean Response")
         out.write(
             brute_force_table_cat_cat.to_html(
                 index=False,
@@ -521,8 +634,18 @@ def main():
                 escape=False,
             )
         )
+        out.write("<br>Correlation Heat Plots")
+        out.write(
+            correlation_table_cat_cat.to_html(
+                index=False,
+                na_rep="None",
+                render_links=True,
+                escape=False,
+            )
+        )
 
-    # compare all categorical predictors to all continuous predictors
+    # categorical v. continuous predictors
+    # set up empty dfs to store outputs
     brute_force_table_cat_cont = pd.DataFrame(
         columns=[
             "predictor 1",
@@ -535,8 +658,31 @@ def main():
             "Average Response Plot",
         ]
     )
+    correlation_table_cat_cont = pd.DataFrame(
+        columns=[
+            "predictor 1",
+            "predictor 2",
+            "predictor 1 type",
+            "predictor 2 type",
+            "correlation ratio (Pearson's)",
+            "absolute value of corr ratio",
+            "link to heat plot",
+        ]
+    )
     for catpred in cat_predictors:
         for contpred in cont_predictors:
+            corr = cat_cont_correlation_ratio(df[catpred], df[contpred])
+            plot_cat_cont(df, catpred, contpred, output_dir)
+            correlation_table_cat_cont.loc[len(correlation_table_cat_cont)] = [
+                catpred,
+                contpred,
+                "categorical",
+                "continuous",
+                corr,
+                abs(corr),
+                f"<a href='//{output_dir}/predictor v. predictor correlation plot - {catpred} v. {contpred}.html'>correlation plot - {catpred} v. {contpred}</a>",  # noqa: E501
+            ]
+
             dmr, wdmr = dmr_2d_cat_cont(df, catpred, contpred, response, output_dir)
             brute_force_table_cat_cont.loc[len(brute_force_table_cat_cont)] = [
                 catpred,
@@ -552,9 +698,108 @@ def main():
     brute_force_table_cat_cont.sort_values(
         by="Weighted DMR", ascending=False, inplace=True
     )
-    with open(f"{output_dir}/cat-cont-brute-force-comparison-table.html", "w") as out:
+    correlation_table_cat_cont.sort_values(
+        by="correlation ratio (Pearson's)", ascending=False, inplace=True
+    )
+
+    # write html table outputs
+    with open(html_predictor_comparison_table_output_file, "a") as out:
+        out.write("<br><br><h1>Categorical-Continuous Predictor Comparisons</h1>")
+        out.write("<h3>Weighted Difference of Mean Response")
         out.write(
             brute_force_table_cat_cont.to_html(
+                index=False,
+                na_rep="None",
+                render_links=True,
+                escape=False,
+            )
+        )
+        out.write("<br>Correlation Violin Plots")
+        out.write(
+            correlation_table_cat_cont.to_html(
+                index=False,
+                na_rep="None",
+                render_links=True,
+                escape=False,
+            )
+        )
+
+    # continuous v. continuous predictors
+    # compare all continuous predictors to all continuous predictors
+    brute_force_table_cont_cont = pd.DataFrame(
+        columns=[
+            "predictor 1",
+            "predictor 2",
+            "predictor 1 type",
+            "predictor 2 type",
+            "Difference of Mean Response",
+            "Weighted DMR",
+            "Population Proportion Plot",
+            "Average Response Plot",
+        ]
+    )
+    correlation_table_cont_cont = pd.DataFrame(
+        columns=[
+            "predictor 1",
+            "predictor 2",
+            "predictor 1 type",
+            "predictor 2 type",
+            "correlation ratio (R)",
+            "R absolute value",
+            "p-value",
+            "t-value",
+            "link to heat plot",
+        ]
+    )
+    for contpred1, contpred2 in itertools.combinations(cont_predictors, 2):
+        # continuous v. continuous correlation ratio
+        p_value, t_value, r_value = linear_regression(df, contpred1, contpred2)
+
+        plot_cont_cont(df, contpred1, contpred2, output_dir)
+        correlation_table_cont_cont.loc[len(correlation_table_cont_cont)] = [
+            contpred1,
+            contpred2,
+            "continuous",
+            "continuous",
+            r_value,
+            abs(r_value),
+            p_value,
+            t_value,
+            f"<a href='//{output_dir}/predictor v. predictor correlation plot - {contpred1} v. {contpred2}.html'>correlation plot - {contpred1} v. {contpred2}</a>",  # noqa: E501
+        ]
+        # cont. v. cont. wDMR
+        dmr, wdmr = dmr_2d_cont_cont(df, contpred1, contpred2, response, output_dir)
+        brute_force_table_cont_cont.loc[len(brute_force_table_cont_cont)] = [
+            contpred1,
+            contpred2,
+            "continuous",
+            "continuous",
+            dmr,
+            wdmr,
+            f"<a href='//{output_dir}/predictor v. predictor population proportion - {contpred1} v. {contpred2}.html'>population proportion - {contpred1} v. {contpred2}</a>",  # noqa: E501
+            f"<a href='//{output_dir}/predictor v. predictor average response - {contpred1} v. {contpred2}.html'>average response - {contpred1} v. {contpred2}</a>",  # noqa: E501
+        ]
+
+    brute_force_table_cont_cont.sort_values(
+        by="Weighted DMR", ascending=False, inplace=True
+    )
+    correlation_table_cont_cont.sort_values(
+        by="R absolute value", ascending=False, inplace=True
+    )
+    with open(html_predictor_comparison_table_output_file, "a") as out:
+        out.write("<br><br><h1>Continuous-Continuous Predictor Comparisons</h1>")
+        out.write("<h3>Weighted Difference of Mean Response")
+        out.write(
+            brute_force_table_cont_cont.to_html(
+                index=False,
+                na_rep="None",
+                render_links=True,
+                escape=False,
+            )
+        )
+        out.write("<br>Correlation Scatter Plots")
+        out.write(
+            correlation_table_cont_cont.to_html(
                 index=False,
                 na_rep="None",
                 render_links=True,
