@@ -516,8 +516,8 @@ def dataset_insert_data():
     """
     df = pd.read_csv("/Users/sean/workspace/Sean/sdsu/BDA602/heart disease data.csv")
 
-    response = "age"
-    # response = "Heart Disease"
+    # response = "age"
+    response = "Heart Disease"
     predictors = [
         "age",
         "sex",
@@ -588,11 +588,18 @@ def main():
             "link to heat plot",
         ]
     )
+    cat_cat_correlation_array = pd.DataFrame(
+        columns=cat_predictors, index=cat_predictors
+    )
     # get all pairwise unique combinations of categorical predictors
     for catpred1, catpred2 in itertools.combinations(cat_predictors, 2):
-        # cat v. cat correlation ratio
+        # cat. v. cat. correlation ratio
         corr = cat_correlation(df[catpred1], df[catpred2])
+        cat_cat_correlation_array[catpred1][catpred2] = abs(corr)
+        cat_cat_correlation_array[catpred2][catpred1] = abs(corr)
+
         plot_cat_cat(df, catpred1, catpred2, output_dir)
+
         correlation_table_cat_cat.loc[len(correlation_table_cat_cat)] = [
             catpred1,
             catpred2,
@@ -602,7 +609,7 @@ def main():
             abs(corr),
             f"<a href='//{output_dir}/predictor v. predictor correlation plot - {catpred1} v. {catpred2}.html'>correlation plot - {catpred1} v. {catpred2}</a>",  # noqa: E501
         ]
-        # cat v. cat wDMR
+        # cat. v. cat. wDMR
         dmr, wdmr = dmr_2d_cat_cat(df, catpred1, catpred2, response, output_dir)
         brute_force_table_cat_cat.loc[len(brute_force_table_cat_cat)] = [
             catpred1,
@@ -620,6 +627,13 @@ def main():
     )
     correlation_table_cat_cat.sort_values(
         by="correlation ratio (Cramer's V)", ascending=False, inplace=True
+    )
+
+    cat_cat_correlation_plot = px.imshow(cat_cat_correlation_array, text_auto=True)
+    cat_cat_correlation_plot.update_layout(
+        title="Cramer's V correlation metric between predictors",
+        xaxis_title="categorical predictors",
+        yaxis_title="categorical predictors",
     )
 
     # write html table outputs
@@ -643,6 +657,8 @@ def main():
                 escape=False,
             )
         )
+        out.write("<br>")
+        out.write(to_html(cat_cat_correlation_plot, include_plotlyjs="cdn"))
 
     # categorical v. continuous predictors
     # set up empty dfs to store outputs
@@ -669,10 +685,18 @@ def main():
             "link to heat plot",
         ]
     )
+    cat_cont_correlation_array = pd.DataFrame(
+        columns=cat_predictors, index=cont_predictors
+    )
+    # get all combinations between categorical and continuous predictors
     for catpred in cat_predictors:
         for contpred in cont_predictors:
+            # cat. v. cont. correlation ratio
             corr = cat_cont_correlation_ratio(df[catpred], df[contpred])
+            cat_cont_correlation_array[catpred][contpred] = abs(corr)
+
             plot_cat_cont(df, catpred, contpred, output_dir)
+
             correlation_table_cat_cont.loc[len(correlation_table_cat_cont)] = [
                 catpred,
                 contpred,
@@ -682,7 +706,7 @@ def main():
                 abs(corr),
                 f"<a href='//{output_dir}/predictor v. predictor correlation plot - {catpred} v. {contpred}.html'>correlation plot - {catpred} v. {contpred}</a>",  # noqa: E501
             ]
-
+            # cat. v. cont. wDMR
             dmr, wdmr = dmr_2d_cat_cont(df, catpred, contpred, response, output_dir)
             brute_force_table_cat_cont.loc[len(brute_force_table_cat_cont)] = [
                 catpred,
@@ -700,6 +724,13 @@ def main():
     )
     correlation_table_cat_cont.sort_values(
         by="correlation ratio (Pearson's)", ascending=False, inplace=True
+    )
+
+    cat_cont_correlation_plot = px.imshow(cat_cont_correlation_array, text_auto=True)
+    cat_cont_correlation_plot.update_layout(
+        title="Correlation Ratio between categorical and continuous predictors",
+        xaxis_title="categorical predictors",
+        yaxis_title="continuous predictors",
     )
 
     # write html table outputs
@@ -723,6 +754,8 @@ def main():
                 escape=False,
             )
         )
+        out.write("<br>")
+        out.write(to_html(cat_cont_correlation_plot, include_plotlyjs="cdn"))
 
     # continuous v. continuous predictors
     # compare all continuous predictors to all continuous predictors
@@ -751,11 +784,18 @@ def main():
             "link to heat plot",
         ]
     )
+    cont_cont_correlation_array = pd.DataFrame(
+        columns=cont_predictors, index=cont_predictors
+    )
     for contpred1, contpred2 in itertools.combinations(cont_predictors, 2):
         # continuous v. continuous correlation ratio
         p_value, t_value, r_value = linear_regression(df, contpred1, contpred2)
 
+        cont_cont_correlation_array[contpred1][contpred2] = abs(r_value)
+        cont_cont_correlation_array[contpred1][contpred2] = abs(r_value)
+
         plot_cont_cont(df, contpred1, contpred2, output_dir)
+
         correlation_table_cont_cont.loc[len(correlation_table_cont_cont)] = [
             contpred1,
             contpred2,
@@ -786,6 +826,14 @@ def main():
     correlation_table_cont_cont.sort_values(
         by="R absolute value", ascending=False, inplace=True
     )
+    cont_cont_correlation_plot = px.imshow(cont_cont_correlation_array, text_auto=True)
+    cont_cont_correlation_plot.update_layout(
+        title="R correlation metric between predictors",
+        xaxis_title="continuous predictors",
+        yaxis_title="continuous predictors",
+    )
+
+    # write html table outputs
     with open(html_predictor_comparison_table_output_file, "a") as out:
         out.write("<br><br><h1>Continuous-Continuous Predictor Comparisons</h1>")
         out.write("<h3>Weighted Difference of Mean Response")
@@ -806,6 +854,8 @@ def main():
                 escape=False,
             )
         )
+        out.write("<br>")
+        out.write(to_html(cont_cont_correlation_plot, include_plotlyjs="cdn"))
 
 
 if __name__ == "__main__":
