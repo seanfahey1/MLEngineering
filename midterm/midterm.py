@@ -14,7 +14,7 @@ from scipy import stats
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
 
-def difference_w_mean_of_resp_1d(df, predictor, response, out_dir):
+def difference_w_mean_of_resp_1d_cont_pred(df, predictor, response, out_dir):
     # returns DMR, wDMR, plot html
     msd_df = pd.DataFrame(
         columns=[
@@ -78,6 +78,67 @@ def difference_w_mean_of_resp_1d(df, predictor, response, out_dir):
             msd_weighted,
         ]
         previous_bin_max += bin_step_size
+
+    msd_value = np.mean(msd_df["MeanSquaredDiff"])
+    msd_weighted_value = np.mean(msd_df["MeanSquaredDiffWeighted"])
+
+    msd_plot = plot_msd(msd_df, predictor)
+
+    with open(
+        out_dir / f"msd plot {predictor} v. response ({response}).html", "w"
+    ) as outfile:
+        outfile.write(msd_plot)
+
+    return msd_df, msd_value, msd_weighted_value
+
+
+def difference_w_mean_of_resp_1d_cat_pred(df, predictor, response, out_dir):
+    # returns DMR, wDMR, plot html
+    msd_df = pd.DataFrame(
+        columns=[
+            "(𝑖)",
+            "BinCenters",
+            "BinCount",
+            "BinMeans (𝜇𝑖)",
+            "PopulationMean (𝜇𝑝𝑜𝑝)",
+            "MeanSquaredDiff",
+            "PopulationProportion (𝑤𝑖)",
+            "MeanSquaredDiffWeighted",
+        ]
+    )
+    df = df[[predictor, response]].dropna()
+    df = df.sort_values(by=predictor, ascending=True).reset_index(drop=True)
+
+    pop_mean_response = np.mean(df[response])
+
+    for i, pred_value in enumerate(df[predictor].unique()):
+        # get just the values for the current bin
+        bin_df = df[df[predictor] == pred_value]
+        bin_count = len(bin_df)
+        pop_porp = bin_count / len(df)
+        bin_center = pred_value
+        # assign values to bin
+        if bin_count > 0:
+            mean_response = np.mean(bin_df[response])
+            msd = (mean_response - pop_mean_response) ** 2 / bin_count
+            msd_weighted = msd * pop_porp
+
+        else:
+            mean_response = None
+            msd = None
+            msd_weighted = None
+
+        # assign values to the next row in the df
+        msd_df.loc[len(msd_df)] = [
+            str(int(i)),
+            bin_center,
+            bin_count,
+            mean_response,
+            pop_mean_response,
+            msd,
+            pop_porp,
+            msd_weighted,
+        ]
 
     msd_value = np.mean(msd_df["MeanSquaredDiff"])
     msd_weighted_value = np.mean(msd_df["MeanSquaredDiffWeighted"])
@@ -566,6 +627,10 @@ def determine_cat_cont(df, predictors, response):
     except ValueError:
         response_cat = True
 
+    # handle an exception for boolean true/false values that can be converted to floats
+    if len(df[response].unique()) == 2:
+        response_cat = True
+
     return cat_predictors, cont_predictors, response_cat
 
 
@@ -575,8 +640,8 @@ def dataset_insert_data():
     """
     df = pd.read_csv("/Users/sean/workspace/Sean/sdsu/BDA602/heart disease data.csv")
 
-    response = "age"
-    # response = "Heart Disease"
+    # response = "age"
+    response = "Heart Disease"
     predictors = [
         "age",
         "sex",
@@ -886,7 +951,7 @@ def main():
         p_value, t_value, r_value = linear_regression(df, contpred1, contpred2)
 
         cont_cont_correlation_array[contpred1][contpred2] = abs(r_value)
-        cont_cont_correlation_array[contpred1][contpred2] = abs(r_value)
+        cont_cont_correlation_array[contpred2][contpred1] = abs(r_value)
 
         plot_cont_cont(df, contpred1, contpred2, output_dir)
 
@@ -961,8 +1026,8 @@ def main():
             "min",
             "max",
             "median",
-            "p-value",
-            "t-value",
+            "correlation metric",
+            "correlation type",
             "RF importance",
             "DMR",
             "wDMR",
@@ -971,17 +1036,22 @@ def main():
         ]
     )
 
+    # Start with continuous predictors
     feature_importances = random_forest(
         df, response, cont_predictors, "categorical" if response_cat else "continuous"
     )
+
     for i, predictor in enumerate(cont_predictors):
         if response_cat:
             plot_cont_pred_cat_resp(df, predictor, response, output_dir)
+            corr = cat_cont_correlation_ratio(df[response], df[predictor])
+            corr_type = "Pearson's"
         else:
             plot_cont_pred_cont_resp(df, predictor, response, output_dir)
+            _, _, corr = linear_regression(df, predictor, response)
+            corr_type = "R"
 
-        p_value, t_value = response_regression(df, predictor, response, response_cat)
-        msd_df, dmr, wdmr = difference_w_mean_of_resp_1d(
+        msd_df, dmr, wdmr = difference_w_mean_of_resp_1d_cont_pred(
             df, predictor, response, output_dir
         )
 
@@ -993,8 +1063,8 @@ def main():
             min(df[predictor]),
             max(df[predictor]),
             np.median(df[predictor]),
-            p_value,
-            t_value,
+            corr,
+            corr_type,
             feature_importances[i],
             dmr,
             wdmr,
@@ -1002,6 +1072,39 @@ def main():
             f"<a href='//{output_dir}/{predictor} v. response.html'>{predictor} v. response</a>",  # noqa: E501
         ]
 
+    # Then add categorical predictors
+    for i, predictor in enumerate(cat_predictors):
+        if response_cat:
+            plot_cat_pred_cat_resp(df, predictor, response, output_dir)
+            corr = cat_correlation(df[predictor], df[response])
+            corr_type = "Cramer's V"
+        else:
+            plot_cat_pred_cont_resp(df, predictor, response, output_dir)
+            corr = cat_cont_correlation_ratio(df[predictor], df[response])
+            corr_type = "Pearson's"
+
+        msd_df, dmr, wdmr = difference_w_mean_of_resp_1d_cat_pred(
+            df, predictor, response, output_dir
+        )
+
+        output_df.loc[len(output_df)] = [
+            response,
+            predictor,
+            "categorical" if response_cat else "continuous",
+            "categorical",
+            None,
+            None,
+            None,
+            corr,
+            corr_type,
+            None,
+            dmr,
+            wdmr,
+            f"<a href='//{output_dir}/msd plot {predictor} v. response ({response}).html'>DMR - {predictor}</a>",  # noqa: E501
+            f"<a href='//{output_dir}/{predictor} v. response.html'>{predictor} v. response</a>",  # noqa: E501
+        ]
+
+    # write output table
     output_df.sort_values(by="wDMR", ascending=False, inplace=True)
     with open(html_predictor_comparison_table_output_file, "a") as out:
         out.write("<b><h1>Predictor v. Response Comparisons</h1></b>")
