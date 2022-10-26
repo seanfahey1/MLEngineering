@@ -9,6 +9,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import statsmodels.api
 from cat_correlation import cat_cont_correlation_ratio, cat_correlation
+from dataset_loader import get_test_data_set  # noqa: F401
 from plotly.io import to_html
 from scipy import stats
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
@@ -103,12 +104,13 @@ def difference_w_mean_of_resp_1d_cont_pred(df, predictor, response, out_dir):
 
 def difference_w_mean_of_resp_1d_cat_pred(df, predictor, response, out_dir):
     """
-
-    @param df:
-    @param predictor:
-    @param response:
-    @param out_dir:
-    @return:
+    Bins the predictor into unique value bins, then calculates the mean response value for each bin and the population
+    mean response value.
+    @param df: input dataframe with predictor and response columns
+    @param predictor: a single predictor column name
+    @param response: a single response column name
+    @param out_dir: the pathlib Path to the output directory
+    @return: difference with mean ot response df, dmr value, wdmr value
     """
     # returns DMR, wDMR, plot html
     msd_df = pd.DataFrame(
@@ -171,6 +173,12 @@ def difference_w_mean_of_resp_1d_cat_pred(df, predictor, response, out_dir):
 
 
 def plot_msd(df, predictor):
+    """
+    Produces a plotly plot of the binned difference with mean of response
+    @param df: A pandas DF with the necessary difference w/ mean response values.
+    @param predictor: The name of the predictor (for plot title/legend)
+    @return: html of a plotly plot for that predictor
+    """
     fig = go.Figure(
         layout=go.Layout(
             title="CLE vs Model",
@@ -206,6 +214,16 @@ def plot_msd(df, predictor):
 
 
 def dmr_2d_cat_cat(df, catpred1, catpred2, response, output_dir):
+    """
+    Produces a 2-D DMR plot between two categorical features. Each bin is each unique value for each of the two
+    features.
+    @param df: The input dataframe with predictor columns and a response column
+    @param catpred1: The name of predictor column #1
+    @param catpred2: The name of predictor column #2
+    @param response: The name of the response column
+    @param output_dir: a pathlib Path to the output directory
+    @return: average DMR and weighted average DMR for the pair of predictors
+    """
     # setup empty arrays to plot
     avg_resp_array = np.zeros((len(df[catpred1].unique()), len(df[catpred2].unique())))
     pop_size_array = np.zeros((len(df[catpred1].unique()), len(df[catpred2].unique())))
@@ -282,6 +300,16 @@ def dmr_2d_cat_cat(df, catpred1, catpred2, response, output_dir):
 
 
 def dmr_2d_cat_cont(df, catpred, contpred, response, output_dir):
+    """
+    Produces a 2-D DMR plot between a categorical and a continuous feature. Each bin is each unique value for each
+    of the two features.
+    @param df: The input dataframe with predictor columns and a response column
+    @param catpred: The name of the categorical predictor column
+    @param contpred: The name of the continuous predictor column
+    @param response: The name of the response column
+    @param output_dir: a pathlib Path to the output directory
+    @return: average DMR and weighted average DMR for the pair of predictors
+    """
     # setup empty arrays to plot
     avg_resp_array = np.zeros((len(df[catpred].unique()), 10))
     pop_size_array = np.zeros((len(df[catpred].unique()), 10))
@@ -300,10 +328,9 @@ def dmr_2d_cat_cont(df, catpred, contpred, response, output_dir):
     dmr_list = []
     wdmr_list = []
 
-    previous_bin_max = min(df[contpred])  # TODO: is this the soruce of the error?
-
     # bin by categorical first
     for row, val in enumerate(row_labels):
+        previous_bin_max = min(df[contpred])
         for col, bin_step_size in enumerate(bin_step_sizes):
             bin = df[
                 (df[contpred] >= previous_bin_max)
@@ -330,7 +357,6 @@ def dmr_2d_cat_cont(df, catpred, contpred, response, output_dir):
 
     avg_dmr = np.mean([x for x in dmr_list if x is not None])
     avg_wdmr = np.mean([x for x in wdmr_list if x is not None])
-
     pop_size_fig = px.imshow(
         pop_size_array,
         text_auto=True,
@@ -373,6 +399,16 @@ def dmr_2d_cat_cont(df, catpred, contpred, response, output_dir):
 
 
 def dmr_2d_cont_cont(df, contpred1, contpred2, response, output_dir):
+    """
+    Produces a 2-D DMR plot between two continuous features. Each bin is each unique value for each of the two
+    features.
+    @param df: The input dataframe with predictor columns and a response column
+    @param contpred1: The name of predictor column #1
+    @param contpred2: The name of predictor column #2
+    @param response: The name of the response column
+    @param output_dir: a pathlib Path to the output directory
+    @return: average DMR and weighted average DMR for the pair of predictors
+    """
     # setup empty arrays to plot
     avg_resp_array = np.zeros((10, 10))
     pop_size_array = np.zeros((10, 10))
@@ -480,6 +516,13 @@ def dmr_2d_cont_cont(df, contpred1, contpred2, response, output_dir):
 
 
 def plot_cat_cat(df, column1, column2, output_dir):
+    """
+    Plots correlation between two categorical predictors
+    @param df: The input dataframe with predictor columns
+    @param column1: The first categorical predictor column name
+    @param column2: The second categorical predictor column name
+    @param output_dir: Pathlib Path to the output directory
+    """
     count_df = (
         df[[column1, column2]]
         .value_counts()
@@ -501,6 +544,13 @@ def plot_cat_cat(df, column1, column2, output_dir):
 
 
 def plot_cat_cont(df, cat_col, cont_col, output_dir):
+    """
+    Plots correlation between a categorical and continuous predictor
+    @param df: The input dataframe with predictor columns
+    @param cat_col: The categorical predictor column name
+    @param cont_col: The continuous predictor column name
+    @param output_dir: Pathlib Path to the output directory
+    """
     fig = px.violin(
         color=df[cat_col],
         y=df[cont_col],
@@ -521,6 +571,13 @@ def plot_cat_cont(df, cat_col, cont_col, output_dir):
 
 
 def plot_cont_cont(df, column1, column2, output_dir):
+    """
+    Plots correlation between two continuous predictors
+    @param df: The input dataframe with predictor columns
+    @param column1: The first continuous predictor column name
+    @param column2: The second continuous predictor column name
+    @param output_dir: Pathlib Path to the output directory
+    """
     fig = px.scatter(
         x=df[column1],
         y=df[column2],
@@ -540,6 +597,13 @@ def plot_cont_cont(df, column1, column2, output_dir):
 
 
 def plot_cont_pred_cont_resp(df, predictor, response, out_dir):
+    """
+    Plots correlation between a continuous predictor and a continuous response
+    @param df: The input dataframe with predictor columns
+    @param predictor: The continuous predictor column name
+    @param response: The continuous response column name
+    @param out_dir: Pathlib Path to the output directory
+    """
     fig = px.scatter(
         x=df[predictor],
         y=df[response],
@@ -559,6 +623,13 @@ def plot_cont_pred_cont_resp(df, predictor, response, out_dir):
 
 
 def plot_cat_pred_cont_resp(df, predictor, response, out_dir):
+    """
+    Plots correlation between a categorical predictor and a continuous response
+    @param df: The input dataframe with predictor columns
+    @param predictor: The categorical predictor column name
+    @param response: The continuous response column name
+    @param out_dir: Pathlib Path to the output directory
+    """
     fig = px.violin(
         color=df[predictor],
         y=df[response],
@@ -579,6 +650,13 @@ def plot_cat_pred_cont_resp(df, predictor, response, out_dir):
 
 
 def plot_cont_pred_cat_resp(df, predictor, response, out_dir):
+    """
+    Plots correlation between a continuous predictor and a categorical response
+    @param df: The input dataframe with predictor columns
+    @param predictor: The continuous predictor column name
+    @param response: The categorical response column name
+    @param out_dir: Pathlib Path to the output directory
+    """
     fig = px.violin(
         color=df[response],
         y=df[predictor],
@@ -599,6 +677,13 @@ def plot_cont_pred_cat_resp(df, predictor, response, out_dir):
 
 
 def plot_cat_pred_cat_resp(df, predictor, response, out_dir):
+    """
+    Plots correlation between a categorical predictor and a categorical response
+    @param df: The input dataframe with predictor columns
+    @param predictor: The categorical predictor column name
+    @param response: The categorical response column name
+    @param out_dir: Pathlib Path to the output directory
+    """
     count_df = (
         df[[predictor, response]]
         .value_counts()
@@ -620,6 +705,15 @@ def plot_cat_pred_cat_resp(df, predictor, response, out_dir):
 
 
 def determine_cat_cont(df, predictors, response):
+    """
+    Determine which predictors in a dataframe are continuous and which are categorical. Also determines if response
+    to be predicted is categorical.
+    @param df: The input dataframe with predictor columns and response column
+    @param predictors: A list of all predictor column names
+    @param response: The response column name
+    @return: list of cat predictors, list of cont predictors, a boolean indicating if the response is categorical
+    """
+
     class FoundCategorical(Exception):
         pass
 
@@ -654,6 +748,7 @@ def determine_cat_cont(df, predictors, response):
 def dataset_insert_data():
     """
     Function to easily drop in different csv formatted datasets and lists of predictor and response columns to use.
+    @return: pandas DataFrame, list of predictor column names, response column name
     """
     df = pd.read_csv("/Users/sean/workspace/Sean/sdsu/BDA602/heart disease data.csv")
 
@@ -673,33 +768,28 @@ def dataset_insert_data():
     ]
 
     predictors = [x for x in predictors if x != response]
+
+    # df, predictors, response = get_test_data_set(data_set_name="titanic_2")
+    # print(df.head())
+
     return df, predictors, response
 
 
 def linear_regression(df, predictor, response):
+    """
+    calculates p-value, t-value, and pearson's correlation coefficient between a predictor and a response
+    @param df: The input dataframe with predictor columns and response column
+    @param predictor: The name of a continuous predictor column
+    @param response: The name of a continuous response column
+    @return: p-value, t-value, pearson's correlation value
+    """
     pred = statsmodels.api.add_constant(df[predictor])
     fitted_output = statsmodels.api.OLS(df[response], pred).fit(disp=0)
     t_value = round(fitted_output.tvalues[1], 6)
     p_value = "{:.6e}".format(fitted_output.pvalues[1])
-    res = stats.linregress(df[predictor], df[response])
+    res = stats.pearsonr(df[predictor], df[response]).statistic
 
-    return p_value, t_value, res.rvalue
-
-
-def response_regression(df, predictor, response, response_cat):
-    # drop any NaN values
-    df = df[[predictor, response]].dropna()
-
-    if response_cat:
-        fitted_output = statsmodels.api.Logit(df[predictor], df[response]).fit(disp=0)
-        t_value = round(fitted_output.tvalues[0], 6)
-        p_value = "{:.6e}".format(fitted_output.pvalues[0])
-    else:
-        pred = statsmodels.api.add_constant(df[predictor])
-        fitted_output = statsmodels.api.OLS(df[response], pred).fit(disp=0)
-        t_value = round(fitted_output.tvalues[1], 6)
-        p_value = "{:.6e}".format(fitted_output.pvalues[1])
-    return p_value, t_value
+    return p_value, t_value, res
 
 
 def random_forest(df, response, predictors, response_type):
@@ -759,7 +849,6 @@ def main():
             "predictor 1 type",
             "predictor 2 type",
             "correlation ratio (Cramer's V)",
-            "absolute value of corr ratio",
             "link to heat plot",
         ]
     )
@@ -781,7 +870,6 @@ def main():
             "categorical",
             "categorical",
             corr,
-            abs(corr),
             f"<a href='//{output_dir}/predictor v. predictor correlation plot - {catpred1} v. {catpred2}.html'>correlation plot - {catpred1} v. {catpred2}</a>",  # noqa: E501
         ]
         # cat. v. cat. wDMR
@@ -803,6 +891,9 @@ def main():
     correlation_table_cat_cat.sort_values(
         by="correlation ratio (Cramer's V)", ascending=False, inplace=True
     )
+
+    for x in cat_cat_correlation_array.columns:
+        cat_cat_correlation_array[x][x] = 1
 
     cat_cat_correlation_plot = px.imshow(cat_cat_correlation_array, text_auto=True)
     cat_cat_correlation_plot.update_layout(
@@ -857,8 +948,7 @@ def main():
             "predictor 1 type",
             "predictor 2 type",
             "correlation ratio",
-            "absolute value of corr ratio",
-            "link to heat plot",
+            "link to violin plot",
         ]
     )
     cat_cont_correlation_array = pd.DataFrame(
@@ -879,7 +969,6 @@ def main():
                 "categorical",
                 "continuous",
                 corr,
-                abs(corr),
                 f"<a href='//{output_dir}/predictor v. predictor correlation plot - {catpred} v. {contpred}.html'>correlation plot - {catpred} v. {contpred}</a>",  # noqa: E501
             ]
             # cat. v. cont. wDMR
@@ -953,11 +1042,11 @@ def main():
             "predictor 2",
             "predictor 1 type",
             "predictor 2 type",
-            "correlation ratio (R)",
-            "R absolute value",
+            "Pearson's Ratio",
+            "Pearson's absolute value",
             "p-value",
             "t-value",
-            "link to heat plot",
+            "link to scatter plot",
         ]
     )
     cont_cont_correlation_array = pd.DataFrame(
@@ -965,10 +1054,10 @@ def main():
     )
     for contpred1, contpred2 in itertools.combinations(cont_predictors, 2):
         # continuous v. continuous correlation ratio
-        p_value, t_value, r_value = linear_regression(df, contpred1, contpred2)
+        p_value, t_value, corr = linear_regression(df, contpred1, contpred2)
 
-        cont_cont_correlation_array[contpred1][contpred2] = abs(r_value)
-        cont_cont_correlation_array[contpred2][contpred1] = abs(r_value)
+        cont_cont_correlation_array[contpred1][contpred2] = abs(corr)
+        cont_cont_correlation_array[contpred2][contpred1] = abs(corr)
 
         plot_cont_cont(df, contpred1, contpred2, output_dir)
 
@@ -977,8 +1066,8 @@ def main():
             contpred2,
             "continuous",
             "continuous",
-            r_value,
-            abs(r_value),
+            corr,
+            abs(corr),
             p_value,
             t_value,
             f"<a href='//{output_dir}/predictor v. predictor correlation plot - {contpred1} v. {contpred2}.html'>correlation plot - {contpred1} v. {contpred2}</a>",  # noqa: E501
@@ -1000,8 +1089,12 @@ def main():
         by="Weighted DMR", ascending=False, inplace=True
     )
     correlation_table_cont_cont.sort_values(
-        by="R absolute value", ascending=False, inplace=True
+        by="Pearson's absolute value", ascending=False, inplace=True
     )
+
+    for x in cont_cont_correlation_array.columns:
+        cont_cont_correlation_array[x][x] = 1
+
     cont_cont_correlation_plot = px.imshow(cont_cont_correlation_array, text_auto=True)
     cont_cont_correlation_plot.update_layout(
         title="R correlation metric between predictors",
@@ -1040,9 +1133,9 @@ def main():
             "Predictor",
             "Response Type",
             "Predictor Type",
-            "min",
-            "max",
-            "median",
+            "predictor min",
+            "predictor max",
+            "predictor median",
             "correlation metric",
             "correlation type",
             "RF importance",
@@ -1066,7 +1159,7 @@ def main():
         else:
             plot_cont_pred_cont_resp(df, predictor, response, output_dir)
             _, _, corr = linear_regression(df, predictor, response)
-            corr_type = "R"
+            corr_type = "Pearson's"
 
         msd_df, dmr, wdmr = difference_w_mean_of_resp_1d_cont_pred(
             df, predictor, response, output_dir
