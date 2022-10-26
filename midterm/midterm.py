@@ -15,6 +15,15 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
 
 def difference_w_mean_of_resp_1d_cont_pred(df, predictor, response, out_dir):
+    """
+    Bins the predictor into 10 bins, then calculates the mean response value for each bin and the population mean
+    response value.
+    @param df: input dataframe with predictor and response columns
+    @param predictor: a single predictor column name
+    @param response: a single response column name
+    @param out_dir: the pathlib Path to the output directory
+    @return: difference with mean ot response df, dmr value, wdmr value
+    """
     # returns DMR, wDMR, plot html
     msd_df = pd.DataFrame(
         columns=[
@@ -93,6 +102,14 @@ def difference_w_mean_of_resp_1d_cont_pred(df, predictor, response, out_dir):
 
 
 def difference_w_mean_of_resp_1d_cat_pred(df, predictor, response, out_dir):
+    """
+
+    @param df:
+    @param predictor:
+    @param response:
+    @param out_dir:
+    @return:
+    """
     # returns DMR, wDMR, plot html
     msd_df = pd.DataFrame(
         columns=[
@@ -839,7 +856,7 @@ def main():
             "predictor 2",
             "predictor 1 type",
             "predictor 2 type",
-            "correlation ratio (Pearson's)",
+            "correlation ratio",
             "absolute value of corr ratio",
             "link to heat plot",
         ]
@@ -882,7 +899,7 @@ def main():
         by="Weighted DMR", ascending=False, inplace=True
     )
     correlation_table_cat_cont.sort_values(
-        by="correlation ratio (Pearson's)", ascending=False, inplace=True
+        by="correlation ratio", ascending=False, inplace=True
     )
 
     cat_cont_correlation_plot = px.imshow(cat_cont_correlation_array, text_auto=True)
@@ -1045,7 +1062,7 @@ def main():
         if response_cat:
             plot_cont_pred_cat_resp(df, predictor, response, output_dir)
             corr = cat_cont_correlation_ratio(df[response], df[predictor])
-            corr_type = "Pearson's"
+            corr_type = "Correlation Ratio"
         else:
             plot_cont_pred_cont_resp(df, predictor, response, output_dir)
             _, _, corr = linear_regression(df, predictor, response)
@@ -1081,7 +1098,7 @@ def main():
         else:
             plot_cat_pred_cont_resp(df, predictor, response, output_dir)
             corr = cat_cont_correlation_ratio(df[predictor], df[response])
-            corr_type = "Pearson's"
+            corr_type = "Correlation Ratio"
 
         msd_df, dmr, wdmr = difference_w_mean_of_resp_1d_cat_pred(
             df, predictor, response, output_dir
