@@ -2,6 +2,7 @@
 import itertools
 import pathlib
 import sys
+from distutils import util
 
 import numpy as np
 import pandas as pd
@@ -13,6 +14,27 @@ from dataset_loader import get_test_data_set  # noqa: F401
 from plotly.io import to_html
 from scipy import stats
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+
+
+def test_cat_response(values):
+    """
+    Test a categorical response column if it can be converted to a bool/float/int
+    @param values: single DF column
+    @return: the same column, a list, or None. Plus a modifier to indicate if the input was modified or failed.
+    """
+    try:
+        for x in values:
+            _ = float(x)
+        return values, False
+    except ValueError:
+        response_values = []
+        try:
+            for x in values:
+                response_values.append(int(util.strtobool(x)))
+            values = response_values, True
+            return values
+        except ValueError:
+            return values, None
 
 
 def difference_w_mean_of_resp_1d_cont_pred(df, predictor, response, out_dir):
@@ -40,7 +62,7 @@ def difference_w_mean_of_resp_1d_cont_pred(df, predictor, response, out_dir):
             "MeanSquaredDiffWeighted",
         ]
     )
-    df = df[[predictor, response]].dropna()
+    df = df[[predictor, response]].dropna().reset_index()
     df = df.sort_values(by=predictor, ascending=True).reset_index(drop=True)
 
     # figure out number of samples to use per bin
@@ -125,7 +147,7 @@ def difference_w_mean_of_resp_1d_cat_pred(df, predictor, response, out_dir):
             "MeanSquaredDiffWeighted",
         ]
     )
-    df = df[[predictor, response]].dropna()
+    df = df[[predictor, response]].dropna().reset_index(drop=True)
     df = df.sort_values(by=predictor, ascending=True).reset_index(drop=True)
 
     pop_mean_response = np.mean(df[response])
@@ -224,6 +246,26 @@ def dmr_2d_cat_cat(df, catpred1, catpred2, response, output_dir):
     @param output_dir: a pathlib Path to the output directory
     @return: average DMR and weighted average DMR for the pair of predictors
     """
+    # test if response can be treated as numeric (ie. boolean or 0/1 int type values)
+    response_values, modified = test_cat_response(df[response])
+    if modified is True:
+        df[response] = response_values
+    elif modified is None:
+        # can't work with this data :(
+        with open(
+            output_dir
+            / f"predictor v. predictor average response - {catpred1} v. {catpred2}.html",
+            "w",
+        ) as out:
+            out.write("")
+        with open(
+            output_dir
+            / f"predictor v. predictor population proportion - {catpred1} v. {catpred2}.html",
+            "w",
+        ) as out:
+            out.write("")
+        return None, None
+
     # setup empty arrays to plot
     avg_resp_array = np.zeros((len(df[catpred1].unique()), len(df[catpred2].unique())))
     pop_size_array = np.zeros((len(df[catpred1].unique()), len(df[catpred2].unique())))
@@ -729,8 +771,10 @@ def determine_cat_cont(df, predictors, response):
                     raise FoundCategorical
         except FoundCategorical:
             continue
-
-        cont_predictors.append(predictor)
+        if len(df[predictor].unique()) <= 2:
+            cat_predictors.append(predictor)
+        else:
+            cont_predictors.append(predictor)
 
     try:
         _ = [float(x) for x in df[response].unique()]
@@ -768,9 +812,8 @@ def dataset_insert_data():
     ]
 
     predictors = [x for x in predictors if x != response]
-
-    # df, predictors, response = get_test_data_set(data_set_name="titanic_2")
-    # print(df.head())
+    df, predictors, response = get_test_data_set(data_set_name="titanic_2")
+    df = df.reset_index(drop=True)
 
     return df, predictors, response
 
@@ -801,7 +844,7 @@ def random_forest(df, response, predictors, response_type):
         raise ValueError("invalid response type")
 
     relevant_columns = [response] + predictors
-    df = df[relevant_columns].dropna()
+    df = df[relevant_columns].dropna().reset_index(drop=True)
     X = df[predictors].to_numpy()
 
     if X.shape[1] == 1:
