@@ -3,8 +3,10 @@ drop table if exists batter_100;
 drop table if exists pitcher_per_game;
 drop table if exists pitcher_100;
 drop table if exists game_features;
+drop table if exists pregame_odds_best_final;
 
-create or replace table batter_per_game
+/*
+create or replace table batter_per_game (primary key(batter_id, game)) as
 select 
 	bc.batter as batter_id
 	, bc.team_id as teamid
@@ -21,13 +23,9 @@ left join team t on t.team_id = bc.team_id
 where substring_index(g.local_date, "-", 1) is not null
 group by batter_id, local_date
 order by batter_id asc, local_date desc
-limit 25000
 ;
 
-alter table batter_per_game
-add primary key (batter_id, game);
-
-create or replace table batter_100 as
+create or replace table batter_100 (primary key(batter_id, game)) as
 select 
 	p1.batter_id as batter_id
 	, p1.teamid as teamid
@@ -43,11 +41,13 @@ FROM batter_per_game p1
 left join batter_per_game p2 on p1.batter_id = p2.batter_id 
 group by p1.local_date, batter_id
 order by p1.batter_id desc, p1.local_date asc
+limit 10
 ;
 
 select * from batter_100;
+*/
 
-create or replace table pitcher_per_game
+create or replace table pitcher_per_game (primary key(pitcher, game_id)) as
 select 
 	pc.pitcher
 	, pc.game_id
@@ -68,13 +68,9 @@ left join game g on g.game_id = pc.game_id
 where substring_index(g.local_date, "-", 1) is not null
 group by pitcher, local_date
 order by pitcher asc, local_date desc
-limit 25000
 ;
 
-alter table pitcher_per_game
-add primary key (pitcher, game_id);
-
-create or replace table pitcher_100 as
+create or replace table pitcher_100 (primary key(pitcher, game_id)) as
 select 
 	p1.pitcher
 	, p1.team_id
@@ -99,22 +95,39 @@ order by p1.pitcher desc, p1.local_date asc
 
 select * from pitcher_100;
 
-alter table pitcher_100
-add primary key (pitcher, game_id);
+create or replace table pregame_odds_last_update as
+select 
+	po.*
+from pregame_odds po
+left join pregame_odds b on po.game_id = b.game_id and po.capture_date < b.capture_date
+where b.capture_date is null
+order by game_id asc
+;
 
-create or replace table game_features as
+create or replace table pregame_odds_best_final (primary key(game_id)) as 
 select
-	g.game_id
+	game_id
+	, max(home_line) as home_best_odds
+	, max(away_line) as away_best_odds
+from pregame_odds_last_update
+group by game_id
+;
+
+select * from pregame_odds_best_final;
+
+create or replace table game_features (primary key(game_id)) as
+select
+	g.game_id as game_id
 	, case when tr.win_lose = "W" then 1 else 0 end as home_team_wins
 	, g.home_team_id
 	, g.away_team_id
 	, g.local_date
-	, case when (g.home_w + g.home_l) > 0 then g.home_w / (g.home_w + g.home_l) else 0 end as home_win_rate
+  	, case when (g.home_w + g.home_l) > 0 then g.home_w / (g.home_w + g.home_l) else 0 end as home_win_rate
 	, case when (g.away_w + g.away_l) > 0 then g.away_w / (g.away_w + g.away_l) else 0 end as away_win_rate
 	, g.home_pitcher
 	, g.away_pitcher
-	, hp.atBat_100 as home_pitcher_atBat_100
-	, ap.atBat_100 as away_pitcher_atBat_100
+ 	, hp.atBat_100 as home_pitcher_atBat_100
+ 	, ap.atBat_100 as away_pitcher_atBat_100
 	, hp.plateApperance_100 as home_pitcher_plateApperance_100
 	, ap.plateApperance_100 as away_pitcher_plateApperance_100
 	, hp.Hit_100 as home_pitcher_Hit_100
@@ -149,12 +162,14 @@ select
 	, pg.away_hits as away_pitcher_season_hits
 	, pg.away_runs as away_pitcher_season_runs
 	, pg.away_errors as away_pitcher_season_errors
-from game g
+	, po.home_best_odds
+	, po.away_best_odds
+from game g		/* correct this */
 left join pitcher_100 hp on g.home_pitcher = hp.pitcher and hp.game_id = g.game_id
 left join pitcher_100 ap on g.away_pitcher = ap.pitcher and ap.game_id = g.game_id
 left join team_results tr on g.game_id = tr.game_id and g.home_team_id = tr.team_id
 left join pregame_detail pg on g.game_id = pg.game_id
-
+left join pregame_odds_best_final po on g.game_id = po.game_id
 order by local_date desc
 ;
 
@@ -162,14 +177,3 @@ alter table game_features
 add primary key (game_id);
 
 select * from game_features;
-
-
-
-
-
-
-
-
-
-
-
