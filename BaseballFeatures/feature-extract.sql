@@ -171,7 +171,7 @@ left join pitcher_100 ap on g.away_pitcher = ap.pitcher and ap.game_id = g.game_
 left join team_results tr on g.game_id = tr.game_id and g.home_team_id = tr.team_id
 left join pregame_detail pg on g.game_id = pg.game_id
 left join pregame_odds_best_final po on g.game_id = po.game_id
-order by game asc
+order by game_id asc
 ;
 
 select * from game_features;
