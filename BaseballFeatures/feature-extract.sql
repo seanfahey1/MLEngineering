@@ -60,6 +60,7 @@ select
 	, pc.Triple
 	, pc.Home_Run
 	, pc.Walk
+	, case when pc.plateApperance = 0 then 0 else (pc.Walk + pc.Hit) / (pc.plateApperance / 3) end as WHIP
 	, pc.Strikeout
 	, pc.Hit_By_Pitch
 	, cast(g.local_date as date) as local_date
@@ -84,6 +85,7 @@ select
 	, sum(case when datediff(p1.local_date, p2.local_date) between 1 and 100 and p1.pitcher = p2.pitcher then p2.Triple end) as Triple_100
 	, sum(case when datediff(p1.local_date, p2.local_date) between 1 and 100 and p1.pitcher = p2.pitcher then p2.Home_Run end) as Home_Run_100
 	, sum(case when datediff(p1.local_date, p2.local_date) between 1 and 100 and p1.pitcher = p2.pitcher then p2.Walk end) as Walk_100
+	, sum(case when datediff(p1.local_date, p2.local_date) between 1 and 100 and p1.pitcher = p2.pitcher then p2.WHIP end) as WHIP_100
 	, sum(case when datediff(p1.local_date, p2.local_date) between 1 and 100 and p1.pitcher = p2.pitcher then p2.Strikeout end) as Strikeout_100
 	, sum(case when datediff(p1.local_date, p2.local_date) between 1 and 100 and p1.pitcher = p2.pitcher then p2.Hit_By_Pitch end) as Hit_By_Pitch_100
 	, sum(case when datediff(p1.local_date, p2.local_date) between 1 and 100 and p1.pitcher = p2.pitcher then 1 end) as num_game
@@ -142,6 +144,8 @@ select
 	, ap.Home_Run_100 as away_pitcher_Home_Run_100
 	, hp.Walk_100 as home_pitcher_Walk_100
 	, ap.Walk_100 as away_pitcher_Walk_100
+	, hp.WHIP_100 as home_pitcher_WHIP_100
+	, ap.WHIP_100 as away_pitcher_WHIP_100
 	, hp.Strikeout_100 as home_pitcher_Strikeout_100
 	, ap.Strikeout_100 as away_pitcher_Strikeout_100
 	, hp.Hit_By_Pitch_100 as home_pitcher_Hit_By_Pitch_100
@@ -170,7 +174,7 @@ left join pitcher_100 ap on g.away_pitcher = ap.pitcher and ap.game_id = g.game_
 left join team_results tr on g.game_id = tr.game_id and g.home_team_id = tr.team_id
 left join pregame_detail pg on g.game_id = pg.game_id
 left join pregame_odds_best_final po on g.game_id = po.game_id
-order by local_date desc
+order by game asc
 ;
 
 alter table game_features
