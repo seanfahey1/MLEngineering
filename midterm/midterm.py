@@ -826,6 +826,7 @@ def linear_regression(df, predictor, response):
     @param response: The name of a continuous response column
     @return: p-value, t-value, pearson's correlation value
     """
+    df = df.dropna(axis=0)
     pred = statsmodels.api.add_constant(df[predictor])
     fitted_output = statsmodels.api.OLS(df[response], pred).fit(disp=0)
     t_value = round(fitted_output.tvalues[1], 6)
