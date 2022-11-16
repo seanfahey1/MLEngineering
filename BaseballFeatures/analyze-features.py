@@ -12,6 +12,10 @@ from plotly.io import to_html
 from pyspark import StorageLevel
 from pyspark.ml.feature import SQLTransformer
 from pyspark.sql import SparkSession
+from sklearn.ensemble import RandomForestClassifier as rfc
+from sklearn.linear_model import SGDClassifier as sgd
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 
 sys.path.append(str(Path(__file__).parent / "../midterm"))
 import midterm  # noqa: E402
@@ -529,21 +533,22 @@ def main(load_from_disk=False):
             np.nan if str(x) == "None" or x == "" else str(x)
             for x in df[column].tolist()
         ]
-    # df[convert_to_string]
-    # df[convert_to_string] = df[convert_to_string].astype(str)
+
+    # add a year column to split data on
+    df["year"] = [x.year for x in df["local_date"].tolist()]
 
     categorical_predictors = ["home_throwinghand", "away_throwinghand"]
     continuous_predictors = [
         "home_win_rate",
         "away_win_rate",
-        "home_pitcher",
-        "away_pitcher",
+        # "home_pitcher",
+        # "away_pitcher",
         "home_pitcher_atBat_100",
         "away_pitcher_atBat_100",
-        "home_pitcher_plateApperance_100",
-        "away_pitcher_plateApperance_100",
-        "home_pitcher_Hit_100",
-        "away_pitcher_Hit_100",
+        # "home_pitcher_plateApperance_100", # correlates to well with atBat
+        # "away_pitcher_plateApperance_100", # correlates to well with atBat
+        # "home_pitcher_Hit_100", # correlates to well with WHIP
+        # "away_pitcher_Hit_100", # correlates to well with WHIP
         "home_pitcher_Single_100",
         "away_pitcher_Single_100",
         "home_pitcher_Double_100",
@@ -552,18 +557,18 @@ def main(load_from_disk=False):
         "away_pitcher_Triple_100",
         "home_pitcher_Home_Run_100",
         "away_pitcher_Home_Run_100",
-        "home_pitcher_Walk_100",
-        "away_pitcher_Walk_100",
+        # "home_pitcher_Walk_100", # correlates to well with WHIP
+        # "away_pitcher_Walk_100", # correlates to well with WHIP
         "home_pitcher_WHIP_100",
         "away_pitcher_WHIP_100",
         "home_pitcher_Strikeout_100",
         "away_pitcher_Strikeout_100",
-        "home_pitcher_Hit_By_Pitch_100",
-        "away_pitcher_Hit_By_Pitch_100",
+        # "home_pitcher_Hit_By_Pitch_100",
+        # "away_pitcher_Hit_By_Pitch_100",
         "home_pitcher_num_game_100",
         "away_pitcher_num_game_100",
-        "home_team_streak",
-        "away_team_streak",
+        # "home_team_streak", # seems to be cheating somehow :(
+        # "away_team_streak", # seems to be cheating somehow :(
         "home_pitcher_season_wins",
         "home_pitcher_season_losses",
         "away_pitcher_season_wins",
@@ -574,13 +579,14 @@ def main(load_from_disk=False):
         "away_pitcher_season_hits",
         "away_pitcher_season_runs",
         "away_pitcher_season_errors",
-        "home_best_odds",
-        "away_best_odds",
+        # "home_best_odds",
+        # "away_best_odds",
     ]
     response = "home_team_wins"
 
     # PREDICTOR V. PREDICTOR CORRELATIONS
     print("Predictor v. predictor correlations")
+
     # setup empty html files to build onto
     html_predictor_comparison_table_output_file = f"{output_dir}/comparison-tables.html"
 
@@ -622,6 +628,52 @@ def main(load_from_disk=False):
         output_dir,
         html_predictor_comparison_table_output_file,
     )
+
+    # PREDICTIONS
+    print("Predicting game outcomes")
+    df = df.dropna(axis=0)
+    train_mask = df.year != 2011
+
+    X = df[continuous_predictors][train_mask]
+    y = df["home_team_wins"][train_mask]
+    X_test = df[continuous_predictors][~train_mask]
+    y_test = df["home_team_wins"][~train_mask].tolist()
+
+    print("--- RANDOM FOREST PREDICTION ---")
+    rf_pipeline = Pipeline(
+        [
+            ("StandardScaler", StandardScaler()),
+            ("RFClassifier", rfc(random_state=123)),
+        ]
+    )
+    rf_pipeline.fit(X, y)
+
+    predictions, _ = rf_pipeline.predict(X_test), rf_pipeline.predict_proba(X_test)
+
+    score = sum(
+        [1 if predictions[i] == y_test[i] else 0 for i in range(len(predictions))]
+    )
+
+    print(f"\t# correct:\t{score}/{len(predictions)}")
+    print(f"\taccuracy:\t{round(score / len(predictions), 4) * 100}%\n\n")
+
+    print("--- SGD PREDICTION ---")
+    sgd_pipeline = Pipeline(
+        [
+            ("StandardScaler", StandardScaler()),
+            ("SGDClassifier", sgd(max_iter=100, tol=1e-4, loss="log_loss")),
+        ]
+    )
+    sgd_pipeline.fit(X, y)
+
+    predictions, _ = sgd_pipeline.predict(X_test), sgd_pipeline.predict_proba(X_test)
+
+    score = sum(
+        [1 if predictions[i] == y_test[i] else 0 for i in range(len(predictions))]
+    )
+
+    print(f"\t# correct:\t{score}/{len(predictions)}")
+    print(f"\taccuracy:\t{round(score / len(predictions), 4) * 100}%\n\n")
 
 
 if __name__ == "__main__":
