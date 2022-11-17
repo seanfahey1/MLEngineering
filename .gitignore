@@ -163,3 +163,4 @@ pyproject.toml
 ./SQLProject/baseball.sql
 ./SQLProject/ponies.sql
 *.DS_Store
+Docker/*

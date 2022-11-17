@@ -12,8 +12,9 @@ from plotly.io import to_html
 from pyspark import StorageLevel
 from pyspark.ml.feature import SQLTransformer
 from pyspark.sql import SparkSession
-from sklearn.ensemble import RandomForestClassifier as rfc
-from sklearn.linear_model import SGDClassifier as sgd
+from sklearn.ensemble import RandomForestClassifier as RFC
+from sklearn.linear_model import SGDClassifier as SGD
+from sklearn.neighbors import KNeighborsClassifier as knn
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
@@ -505,23 +506,45 @@ def main(load_from_disk=False):
             "/Users/sean/workspace/Sean/sdsu/BDA602/DBs/mariadb-java-client-3.0.8.jar"
         )
         user = "sean"
-        dbtable = "baseballdb.game_features"
+        dbtable = "baseballdb.game_features_2"
         query = "select * from game_features_pyspark;"
         password = input("enter password...\t")  # pragma: allowlist secret
         df = baseballdb_connection(user, password, jar_path, dbtable, query)
 
     print("Cleaning up DataFrame")
     convert_to_floats = [
-        "home_win_rate",
-        "away_win_rate",
-        "home_pitcher_atBat_100",
-        "away_pitcher_atBat_100",
-        "home_pitcher_plateApperance_100",
-        "away_pitcher_plateApperance_100",
-        "home_pitcher_Hit_100",
-        "away_pitcher_Hit_100",
-        "home_pitcher_num_game_100",
-        "away_pitcher_num_game_100",
+        "win_rate_diff",
+        "pitcher_100_atBat_diff",
+        "pitcher_100_single_diff",
+        "pitcher_100_double_diff",
+        "pitcher_100_triple_diff",
+        "pitcher_100_HR_diff",
+        "pitcher_100_walk_diff",
+        "pitcher_100_WHIP_diff",
+        "pitcher_100_SO_diff",
+        "pitcher_100_HBP_diff",
+        "pitcher_100_num_games_diff",
+        "home_team_streak",
+        "away_team_streak",
+        "home_pitcher_W_L_diff",
+        "away_pitcher_W_L_diff",
+        "pitcher_win_diff",
+        "pitcher_loss_diff",
+        "pitcher_season_hit_diff",
+        "pitcher_season_runs_diff",
+        "pitcher_season_error_diff",
+        "team_100_games_diff",
+        "team_100_hits_diff",
+        "team_100_to_base_diff",
+        "team_100_HR_diff",
+        "team_100_SO_diff",
+        "team_100_GIDP_diff",
+        "team_GO_diff",
+        "team_LO_diff",
+        "team_PO_diff",
+        "team_BB_diff",
+        "team_DP_diff",
+        "team_TP_diff",
     ]
     convert_to_string = ["home_throwinghand", "away_throwinghand"]
 
@@ -539,48 +562,38 @@ def main(load_from_disk=False):
 
     categorical_predictors = ["home_throwinghand", "away_throwinghand"]
     continuous_predictors = [
-        "home_win_rate",
-        "away_win_rate",
-        # "home_pitcher",
-        # "away_pitcher",
-        "home_pitcher_atBat_100",
-        "away_pitcher_atBat_100",
-        # "home_pitcher_plateApperance_100", # correlates to well with atBat
-        # "away_pitcher_plateApperance_100", # correlates to well with atBat
-        # "home_pitcher_Hit_100", # correlates to well with WHIP
-        # "away_pitcher_Hit_100", # correlates to well with WHIP
-        "home_pitcher_Single_100",
-        "away_pitcher_Single_100",
-        "home_pitcher_Double_100",
-        "away_pitcher_Double_100",
-        "home_pitcher_Triple_100",
-        "away_pitcher_Triple_100",
-        "home_pitcher_Home_Run_100",
-        "away_pitcher_Home_Run_100",
-        # "home_pitcher_Walk_100", # correlates to well with WHIP
-        # "away_pitcher_Walk_100", # correlates to well with WHIP
-        "home_pitcher_WHIP_100",
-        "away_pitcher_WHIP_100",
-        "home_pitcher_Strikeout_100",
-        "away_pitcher_Strikeout_100",
-        # "home_pitcher_Hit_By_Pitch_100",
-        # "away_pitcher_Hit_By_Pitch_100",
-        "home_pitcher_num_game_100",
-        "away_pitcher_num_game_100",
-        # "home_team_streak", # seems to be cheating somehow :(
-        # "away_team_streak", # seems to be cheating somehow :(
-        "home_pitcher_season_wins",
-        "home_pitcher_season_losses",
-        "away_pitcher_season_wins",
-        "away_pitcher_season_losses",
-        "home_pitcher_season_hits",
-        "home_pitcher_season_runs",
-        "home_pitcher_season_errors",
-        "away_pitcher_season_hits",
-        "away_pitcher_season_runs",
-        "away_pitcher_season_errors",
-        # "home_best_odds",
-        # "away_best_odds",
+        "win_rate_diff",
+        "pitcher_100_atBat_diff",
+        "pitcher_100_single_diff",
+        "pitcher_100_double_diff",
+        "pitcher_100_triple_diff",
+        "pitcher_100_HR_diff",
+        "pitcher_100_walk_diff",
+        "pitcher_100_WHIP_diff",
+        "pitcher_100_SO_diff",
+        "pitcher_100_HBP_diff",
+        "pitcher_100_num_games_diff",
+        # "home_team_streak",  # this is cheating, apparently it's taking the calc after game finishes :(
+        # "away_team_streak",  # this is cheating, apparently it's taking the calc after game finishes :(
+        "home_pitcher_W_L_diff",
+        "away_pitcher_W_L_diff",
+        "pitcher_win_diff",
+        "pitcher_loss_diff",
+        "pitcher_season_hit_diff",
+        "pitcher_season_runs_diff",
+        "pitcher_season_error_diff",
+        "team_100_games_diff",
+        "team_100_hits_diff",
+        "team_100_to_base_diff",
+        "team_100_HR_diff",
+        "team_100_SO_diff",
+        "team_100_GIDP_diff",
+        "team_GO_diff",
+        "team_LO_diff",
+        "team_PO_diff",
+        "team_BB_diff",
+        "team_DP_diff",
+        "team_TP_diff",
     ]
     response = "home_team_wins"
 
@@ -630,6 +643,14 @@ def main(load_from_disk=False):
     )
 
     # PREDICTIONS
+    print("Getting dummy variables for categorical predictors")
+    df = pd.get_dummies(
+        df, prefix=["home_throwinghand"], columns=["home_throwinghand"], drop_first=True
+    )
+    df = pd.get_dummies(
+        df, prefix=["away_throwinghand"], columns=["away_throwinghand"], drop_first=True
+    )
+
     print("Predicting game outcomes")
     df = df.dropna(axis=0)
     train_mask = df.year != 2011
@@ -643,7 +664,7 @@ def main(load_from_disk=False):
     rf_pipeline = Pipeline(
         [
             ("StandardScaler", StandardScaler()),
-            ("RFClassifier", rfc(random_state=123)),
+            ("RFClassifier", RFC(random_state=123)),
         ]
     )
     rf_pipeline.fit(X, y)
@@ -661,7 +682,7 @@ def main(load_from_disk=False):
     sgd_pipeline = Pipeline(
         [
             ("StandardScaler", StandardScaler()),
-            ("SGDClassifier", sgd(max_iter=100, tol=1e-4, loss="log_loss")),
+            ("SGDClassifier", SGD(max_iter=100, tol=1e-4, loss="log_loss")),
         ]
     )
     sgd_pipeline.fit(X, y)
@@ -675,6 +696,26 @@ def main(load_from_disk=False):
     print(f"\t# correct:\t{score}/{len(predictions)}")
     print(f"\taccuracy:\t{round(score / len(predictions), 4) * 100}%\n\n")
 
+    print("--- KNN PREDICTION ---")
+    knn_pipeline = Pipeline(
+        [
+            ("StandardScaler", StandardScaler()),
+            ("KNNClassifier", knn(n_neighbors=5)),
+        ]
+    )
+    knn_pipeline.fit(X, y)
+
+    predictions, _ = knn_pipeline.predict(X_test), knn_pipeline.predict_proba(X_test)
+
+    score = sum(
+        [1 if predictions[i] == y_test[i] else 0 for i in range(len(predictions))]
+    )
+
+    print(f"\t# correct:\t{score}/{len(predictions)}")
+    print(f"\taccuracy:\t{round(score / len(predictions), 4) * 100}%\n\n")
+
+    # both RF and SGD did about the same. KNN is a bit worse around 80.5%.
+
 
 if __name__ == "__main__":
-    sys.exit(main(True))
+    sys.exit(main())
