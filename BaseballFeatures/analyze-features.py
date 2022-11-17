@@ -579,9 +579,10 @@ def main(load_from_disk=False):
         "away_pitcher_W_L_diff",
         "pitcher_win_diff",
         "pitcher_loss_diff",
-        "pitcher_season_hit_diff",
-        "pitcher_season_runs_diff",
-        "pitcher_season_error_diff",
+        # I think these are cheating somehow. Looks like pregame detail table actually is calculated post-game
+        # "pitcher_season_hit_diff",
+        # "pitcher_season_runs_diff",
+        # "pitcher_season_error_diff",
         "team_100_games_diff",
         "team_100_hits_diff",
         "team_100_to_base_diff",
