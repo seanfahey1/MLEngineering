@@ -162,4 +162,4 @@ pyproject.toml
 *.tar
 ./SQLProject/baseball.sql
 ./SQLProject/ponies.sql
-*.DS_Dtore
+*.DS_Store
