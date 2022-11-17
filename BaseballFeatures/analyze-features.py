@@ -715,7 +715,7 @@ def main(load_from_disk=False):
     print(f"\t# correct:\t{score}/{len(predictions)}")
     print(f"\taccuracy:\t{round(score / len(predictions), 4) * 100}%\n\n")
 
-    # both RF and SGD did about the same. KNN is a bit worse around 80.5%.
+    # both RF and SGD did about the same. KNN is a bit worse around 56%.
 
 
 if __name__ == "__main__":
