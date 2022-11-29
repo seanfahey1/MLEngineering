@@ -469,11 +469,13 @@ def dmr_2d_cont_cont(df, contpred1, contpred2, response, output_dir):
 
     pop_mean_resp = np.mean(df[response])
     row_labels = [
-        (min(df[contpred1]) + pred_1_bin_step_sizes[0] * x) / 2 + min(df[contpred1])
+        ((pred_1_bin_step_sizes[0] * x) - (pred_1_bin_step_sizes[0] / 2))
+        + min(df[contpred1])
         for x in range(1, 11)
     ]
     col_labels = [
-        (min(df[contpred2]) + pred_2_bin_step_sizes[0] * x) / 2 + min(df[contpred2])
+        ((pred_2_bin_step_sizes[0] * x) - (pred_2_bin_step_sizes[0] / 2))
+        + min(df[contpred2])
         for x in range(1, 11)
     ]
 
@@ -826,6 +828,7 @@ def linear_regression(df, predictor, response):
     @param response: The name of a continuous response column
     @return: p-value, t-value, pearson's correlation value
     """
+    df = df.dropna(axis=0)
     pred = statsmodels.api.add_constant(df[predictor])
     fitted_output = statsmodels.api.OLS(df[response], pred).fit(disp=0)
     t_value = round(fitted_output.tvalues[1], 6)
