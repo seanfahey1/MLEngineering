@@ -1,0 +1,36 @@
+version: "3.8"
+
+services:
+  model-layer:
+    container_name: running-container
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - "./container_output:/app/output"
+    #    ports:
+    #      - "4306:3000"
+    depends_on:
+      - db
+    links:
+      - db
+    #    command: sleep 999999
+    restart: always
+  #    restart: 'no'
+  # ghcr.io/linuxserver/mariadb:latest
+
+  db:
+    container_name: db
+    image: lscr.io/linuxserver/mariadb:latest
+    environment:
+      PUID: 502
+      PGID: 20
+      MYSQL_USER: sean
+      MYSQL_PASSWORD: fahey21 # pragma: allowlist secret
+      MYSQL_ROOT_PASSWORD: fahey21 # pragma: allowlist secret
+      TZ: America/Los_Angeles
+    ports:
+      - "4306:3306"
+    volumes:
+      - "./db-data:/app"
+    restart: always
