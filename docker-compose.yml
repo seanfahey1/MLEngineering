@@ -14,7 +14,7 @@ services:
       - db
     links:
       - db
-    command: sleep 999999
+  #    command: sleep 999999
 
   db:
     container_name: db
@@ -30,5 +30,5 @@ services:
     ports:
       - "4308:3306"
     volumes:
-      - "./Docker/db-data:/app"
+      - "./Docker/db-data:/config/databases"
     restart: always

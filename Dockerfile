@@ -29,7 +29,6 @@ COPY Docker/run.sh /app
 
 # Make directories
 RUN mkdir $APP_HOME/output
-RUN touch $APP_HOME/output/touch_check
 
 # Run script
 RUN ["chmod", "u+x", "run.sh"]

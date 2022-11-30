@@ -164,3 +164,4 @@ pyproject.toml
 ./SQLProject/ponies.sql
 *.DS_Store
 baseball.sql
+container_output/*
