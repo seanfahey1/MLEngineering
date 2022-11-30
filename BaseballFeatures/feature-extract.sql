@@ -1,3 +1,5 @@
+use baseballdb;
+
 drop table if exists batter_per_game;
 drop table if exists batter_100;
 drop table if exists pitcher_per_game;

@@ -8,16 +8,13 @@ services:
       dockerfile: Dockerfile
     volumes:
       - "./container_output:/app/output"
-    #    ports:
-    #      - "4306:3000"
+    ports:
+      - "4307:3000"
     depends_on:
       - db
     links:
       - db
-    #    command: sleep 999999
-    restart: always
-  #    restart: 'no'
-  # ghcr.io/linuxserver/mariadb:latest
+    command: sleep 999999
 
   db:
     container_name: db
@@ -26,11 +23,12 @@ services:
       PUID: 502
       PGID: 20
       MYSQL_USER: sean
-      MYSQL_PASSWORD: fahey21 # pragma: allowlist secret
-      MYSQL_ROOT_PASSWORD: fahey21 # pragma: allowlist secret
+      MYSQL_PASSWORD: fahey # pragma: allowlist secret
+      MYSQL_ROOT_PASSWORD: fahey # pragma: allowlist secret
       TZ: America/Los_Angeles
+      BIND-ADDRESS: 0.0.0.0
     ports:
-      - "4306:3306"
+      - "4308:3306"
     volumes:
-      - "./db-data:/app"
+      - "./Docker/db-data:/app"
     restart: always
