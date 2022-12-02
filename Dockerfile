@@ -24,7 +24,6 @@ RUN rm -rf /var/lib/apt/lists/*
 # Copy files
 COPY baseball.sql .
 COPY Docker/100_day_rolling_calc.sql .
-COPY .venv /app/.venv
 COPY Docker/run.sh /app
 
 # Make directories
