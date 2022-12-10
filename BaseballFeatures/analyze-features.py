@@ -491,7 +491,7 @@ def predictor_v_response_correlations(
         )
 
 
-def main(load_from_disk=False):
+def main(load_from_disk=True):
     # setup output directory
     cwd = Path(__file__).parent.resolve()
     output_dir = cwd / "output"
@@ -506,7 +506,7 @@ def main(load_from_disk=False):
             "/Users/sean/workspace/Sean/sdsu/BDA602/DBs/mariadb-java-client-3.0.8.jar"
         )
         user = "sean"
-        dbtable = "baseballdb.game_features_2"
+        dbtable = "baseballdb.game_features_4"
         query = "select * from game_features_pyspark;"
         password = input("enter password...\t")  # pragma: allowlist secret
         df = baseballdb_connection(user, password, jar_path, dbtable, query)
@@ -524,6 +524,7 @@ def main(load_from_disk=False):
         "pitcher_100_SO_diff",
         "pitcher_100_HBP_diff",
         "pitcher_100_num_games_diff",
+        "pitcher_100_num_games_knot",
         "home_team_streak",
         "away_team_streak",
         "home_pitcher_W_L_diff",
@@ -545,6 +546,8 @@ def main(load_from_disk=False):
         "team_BB_diff",
         "team_DP_diff",
         "team_TP_diff",
+        "days_off_diff",
+        "home_negative_odds",
     ]
     convert_to_string = ["home_throwinghand", "away_throwinghand"]
 
@@ -573,13 +576,14 @@ def main(load_from_disk=False):
         "pitcher_100_SO_diff",
         "pitcher_100_HBP_diff",
         "pitcher_100_num_games_diff",
+        "pitcher_100_num_games_knot",
         # "home_team_streak",  # this is cheating, apparently it's taking the calc after game finishes :(
         # "away_team_streak",  # this is cheating, apparently it's taking the calc after game finishes :(
         "home_pitcher_W_L_diff",
         "away_pitcher_W_L_diff",
         "pitcher_win_diff",
         "pitcher_loss_diff",
-        # I think these are cheating somehow. Looks like pregame detail table actually is calculated post-game
+        # These are cheating. Looks like pregame detail table actually is calculated post-game.
         # "pitcher_season_hit_diff",
         # "pitcher_season_runs_diff",
         # "pitcher_season_error_diff",
@@ -595,6 +599,8 @@ def main(load_from_disk=False):
         "team_BB_diff",
         "team_DP_diff",
         "team_TP_diff",
+        "days_off_diff",
+        "home_negative_odds",
     ]
     response = "home_team_wins"
 
@@ -603,35 +609,35 @@ def main(load_from_disk=False):
 
     # setup empty html files to build onto
     html_predictor_comparison_table_output_file = f"{output_dir}/comparison-tables.html"
-
-    # categorical v. categorical predictors
-    cat_v_cat_predictor_correlations(
-        df,
-        categorical_predictors,
-        response,
-        output_dir,
-        html_predictor_comparison_table_output_file,
-    )
-
-    # categorical v. continuous predictors
-    cat_v_cont_predictor_correlations(
-        df,
-        categorical_predictors,
-        continuous_predictors,
-        response,
-        output_dir,
-        html_predictor_comparison_table_output_file,
-    )
-
-    # continuous v. continuous predictors
-    cont_v_cont_predictor_correlations(
-        df,
-        continuous_predictors,
-        response,
-        output_dir,
-        html_predictor_comparison_table_output_file,
-    )
-
+    #
+    # # categorical v. categorical predictors
+    # cat_v_cat_predictor_correlations(
+    #     df,
+    #     categorical_predictors,
+    #     response,
+    #     output_dir,
+    #     html_predictor_comparison_table_output_file,
+    # )
+    #
+    # # categorical v. continuous predictors
+    # cat_v_cont_predictor_correlations(
+    #     df,
+    #     categorical_predictors,
+    #     continuous_predictors,
+    #     response,
+    #     output_dir,
+    #     html_predictor_comparison_table_output_file,
+    # )
+    #
+    # # continuous v. continuous predictors
+    # cont_v_cont_predictor_correlations(
+    #     df,
+    #     continuous_predictors,
+    #     response,
+    #     output_dir,
+    #     html_predictor_comparison_table_output_file,
+    # )
+    #
     # PREDICTOR V. RESPONSE CORRELATIONS
     print("Predictor v. response correlations")
     predictor_v_response_correlations(
@@ -714,8 +720,6 @@ def main(load_from_disk=False):
 
     print(f"\t# correct:\t{score}/{len(predictions)}")
     print(f"\taccuracy:\t{round(score / len(predictions), 4) * 100}%\n\n")
-
-    # both RF and SGD did about the same. KNN is a bit worse around 56%.
 
 
 if __name__ == "__main__":

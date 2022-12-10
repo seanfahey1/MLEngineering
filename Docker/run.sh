@@ -20,12 +20,12 @@ fi
 
 # check if final table exists and run sql code if it doesn't exist
 FEATURESEXIST=`mysqlshow --user=root --password=fahey -h db baseballdb | grep -v Wildcard | grep -o game_features_3`
-if [ "$FEATURESEXIST" != "game_features_3" ]; then
+#if [ "$FEATURESEXIST" != "game_features_3" ]; then
     echo 'Calculating features, this may take a while'
 #    mysql --user=root --password=fahey -h db < feature-extract.sql
-else
+#else
     echo 'Found feature calculation table'
-fi
+#fi
 
 # log
 date >> output/log.txt

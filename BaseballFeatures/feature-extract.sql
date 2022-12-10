@@ -14,13 +14,14 @@ use baseballdb;
 # drop table if exists team_100_split;
 # drop table if exists team_100;
 # drop table if exists pregame_odds_safe_dates;
-# drop table if exists game_features;
+drop table if exists game_features;
 # drop table if exists home_days_off;
-# drop table if exists game_features_2;
-# drop table if exists game_features_3;
+drop table if exists game_features_2;
+drop table if exists game_features_3;
 # drop table if exists pregame_odds_best_final;
 
 # --------BATTER TABLES--------
+/* removed for faster loading. None of these features were ultimately used.
 # --------per game--------
 create table if not exists batter_per_game (primary key(batter_id, game)) as
 select
@@ -80,7 +81,6 @@ group by p1.local_date, batter_id
 order by p1.batter_id desc, p1.local_date asc
 ;
 
-
 # --------rolling 100 day--------
 create table if not exists batter_100_per_game (primary key(batter_id, game)) as
 select
@@ -99,6 +99,7 @@ left join batter_per_game p2 on p1.batter_id = p2.batter_id
 group by p1.local_date, batter_id
 order by p1.batter_id desc, p1.local_date asc
 ;
+*/
 
 # --------PITCHER TABLES--------
 # --------per game--------
@@ -419,9 +420,39 @@ select
 	, pg.away_errors as away_pitcher_season_errors
 	, po.home_best_odds
 	, po.away_best_odds
+    , hp.Hit_100 / hp.atBat_100 as home_pitcher_hit_rate_100
+    , ap.Hit_100 / ap.atBat_100 as away_pitcher_hit_rate_100
+	, hps.season_Home_Run_100 as home_pitcher_Home_Run_season
+	, aps.season_Home_Run_100 as away_pitcher_Home_Run_season
+	, hps.season_Walk_100 as home_pitcher_Walk_season
+	, aps.season_Walk_100 as away_pitcher_Walk_season
+	, hps.season_WHIP_100 as home_pitcher_WHIP_season
+	, aps.season_WHIP_100 as away_pitcher_WHIP_season
+	, hps.season_Strikeout_100 as home_pitcher_Strikeout_season
+	, aps.season_Strikeout_100 as away_pitcher_Strikeout_season
+	, hps.season_num_game as home_pitcher_num_game_season
+	, aps.season_num_game as away_pitcher_num_game_season
+    , hps.season_Hit_100 / hps.season_atBat_100 as home_pitcher_hit_rate_season
+    , aps.season_Hit_100 / aps.season_atBat_100 as away_pitcher_hit_rate_season
+    , hps.season_Walk_100 / hps.season_atBat_100 as home_pitcher_walk_rate_season
+    , aps.season_Walk_100 / aps.season_atBat_100 as away_pitcher_walk_rate_season
+    , hps.season_Home_Run_100 / hps.season_atBat_100 as home_pitcher_HR_rate_season
+    , aps.season_Home_Run_100 / aps.season_atBat_100 as away_pitcher_HR_rate_season
+	, hpc.career_Strikeout_100 as home_pitcher_Strikeout_career
+	, apc.career_Strikeout_100 as away_pitcher_Strikeout_career
+	, hpc.career_Home_Run_100 as home_pitcher_Home_Run_career
+	, apc.career_Home_Run_100 as away_pitcher_Home_Run_career
+	, hpc.career_Walk_100 as home_pitcher_Walk_career
+	, apc.career_Walk_100 as away_pitcher_Walk_career
+    , hpc.career_Home_Run_100 / hpc.career_atBat_100 as home_pitcher_HR_rate_career
+    , apc.career_Home_Run_100 / apc.career_atBat_100 as away_pitcher_HR_rate_career
 from game g
 left join pitcher_100_per_game hp on g.home_pitcher = hp.pitcher and hp.game_id = g.game_id
 left join pitcher_100_per_game ap on g.away_pitcher = ap.pitcher and ap.game_id = g.game_id
+left join pitcher_season_per_game hps on g.home_pitcher = hps.pitcher and hps.game_id = g.game_id
+left join pitcher_season_per_game aps on g.home_pitcher = aps.pitcher and aps.game_id = g.game_id
+left join pitcher_career_per_game hpc on g.home_pitcher = hpc.pitcher and hpc.game_id = g.game_id
+left join pitcher_career_per_game apc on g.home_pitcher = apc.pitcher and apc.game_id = g.game_id
 inner join team_results tr on g.game_id = tr.game_id and g.home_team_id = tr.team_id
 left join pregame_detail pg on g.game_id = pg.game_id
 left join pregame_odds_best_final po on g.game_id = po.game_id
@@ -489,6 +520,19 @@ select
     , t.BB_100_home - t.BB_100_away as team_BB_diff
     , t.DP_100_home - t.DP_100_away as team_DP_diff
     , t.TP_100_home - t.TP_100_away as team_TP_diff
+    , g.home_pitcher_hit_rate_100 - g.away_pitcher_hit_rate_100 as pitcher_hit_rate_100_diff
+    , g.home_pitcher_Home_Run_season - g.away_pitcher_Home_Run_season as pitcher_season_HR_diff
+    , g.home_pitcher_Walk_season - g.away_pitcher_Walk_season as pitcher_season_walk_diff
+    , g.home_pitcher_WHIP_season - g.away_pitcher_WHIP_season as pitcher_season_WHIP_diff
+    , g.home_pitcher_Strikeout_season - g.away_pitcher_Strikeout_season as pitcher_season_SO_diff
+    , g.home_pitcher_num_game_season - g.away_pitcher_num_game_season as pitcher_season_num_games_diff
+    , g.home_pitcher_hit_rate_season - g.away_pitcher_hit_rate_season as pitcher_season_hit_rate_diff
+    , g.home_pitcher_walk_rate_season - g.away_pitcher_walk_rate_season as pitcher_season_walk_rate_diff
+    , g.home_pitcher_HR_rate_season - g.away_pitcher_HR_rate_season as pitcher_season_HR_rate_diff
+    , g.home_pitcher_Strikeout_career - g.away_pitcher_Strikeout_career as pitcher_career_SO_diff
+    , g.home_pitcher_Home_Run_career - g.away_pitcher_Home_Run_career as pitcher_career_HR_diff
+    , g.home_pitcher_Walk_career - g.away_pitcher_Walk_career as pitcher_career_walk_diff
+    , g.home_pitcher_HR_rate_career - g.away_pitcher_HR_rate_career as pitcher_HR_rate_career_diff
 from game_features g
 left join team_100 t on t.game_id = g.game_id
 ;
