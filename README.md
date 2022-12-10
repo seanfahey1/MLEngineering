@@ -35,7 +35,7 @@ Each feature was calculated using 3 methods; career average, season average, and
 <br><br>
 Season data was not given, so it was calculated based off the game date. I plotted the game dates to confirm no outlier games extended past the usual end of a season.
 <br>
-![alt text](https://github.com/seanfahey1/MLEngineering/blob/Final/game-dates.html?raw=true)
+![alt text](https://github.com/seanfahey1/MLEngineering/blob/final/images/game-dates.html?raw=true)
 <br><br>
 
 ### Feature pruning
