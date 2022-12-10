@@ -35,7 +35,7 @@ Each feature was calculated using 3 methods; career average, season average, and
 <br><br>
 Season data was not given, so it was calculated based off the game date. I plotted the game dates to confirm no outlier games extended past the usual end of a season.
 <br>
-![image alt text](./images/game-dates.html?raw=true "Title")
+![game dates plot](./images/game-dates.png?raw=true)
 <br><br>
 
 ### Feature pruning
