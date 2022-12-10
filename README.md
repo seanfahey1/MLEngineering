@@ -76,17 +76,66 @@ The next step after merging and pruning was to explore the quality of my remaini
 
 ![RF importance plot](./images/RF-importances.png?raw=true)
 
+### Cheating features
+
+Some of these features look suspiciously good. Taking a closer look at the best features shows that I'm clearly leaking
+something that I shouldn't.
+
+![pitcher stats cheating](./images/pitcher-stats-cheating.png?raw=true)
+
+It looks like my pitcher season stats are cheating. Digging into the code I found that pitching season stats leaked
+future data for the current season.
+
+![pitcher stats cheating](./images/streak-cheating.png?raw=true)
+
+Team streak calculations were also done incorrectly. I was accidentally taking the current game into account. Removing
+these features dropped the model accuracy from >90% to ~55%.
+
+![RF importance 2 plot](./images/RF-importances-removing-cheaters.png?raw=true)
+
+Without the cheating features, we see most of the remaining features have some importance weight.
+
 Some features are clearly dominating. How many triples of doubles a team has hit or a pitcher has allowed recently
-seem to barely matter. The most important features are how good the starting pitchers are compared to each other
-(season runs and hits difference), how the teams have been preforming recently (current streak), and how many games
-each team has won over the season.
+seem to barely matter. After team win rates, the most important features are how good the starting pitchers are
+compared to each other (strikeout and WHIP difference), how the teams have been preforming recently (strikeout and OBP).
+
+The most noticeable block of features that is missing from this analysis is the batter statistics. The provided dataset
+had the outcomes for each plate appearance. But a big piece of missing information was which batters were in the
+starting lineup. The provided lineup table had errors and sometimes included more than 10 players. There was no easy
+way for me to pass which players had started in a game when testing the model without leaking information about late
+game strategy. If a team was down by a lot in the 9th put a rookie at first base to give their star player a break, my
+model was going to see it. Furthermore, team stats always seemed to preform just as well if not better than individual
+player stats. The easiest fix for this was to just drop all individual batter statistics and focus on team performance
+as a whole.
 
 # Game Predictions
 
 ### Train-Test split
 
+Because games occur in a chronological order and team performance changes over time as players are traded or injured,
+a traditional 80/20 train/test split doesn't really work. I don't want the model to be trained on any data that happens
+after any test data games. I decided to train the model on the 2007-2010 seasons and retain the 2011 season data for
+testing.
+
+The downside to this method is that teams change, sometimes substantially, between seasons. I haven't tried it yet,
+but the model performance might be better if I set up different models for each season and trained on the first 2/3rds
+of each season and tested on the last 1/3rd.
+
 ### Models selected
 
-### Best model
+I tried 3 models from SKlearn
 
-###
+- [stochastic gradient descent (SGD)](https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.SGDClassifier.html)
+- [k-nearest neighbor (KNN)](https://scikit-learn.org/stable/modules/generated/sklearn.neighbors.KNeighborsClassifier.html)
+- [random forest classifier (RF)](https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestClassifier.html)
+
+Each was set up as a pipeline. Data was normalized using a
+[Standard Scaler](https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.StandardScaler.html) included in each of the 3 pipelines.
+
+### Results
+
+| **Method**               | **RF** | **KNN** |    **SGD** |
+| ------------------------ | -----: | ------: | ---------: |
+| Before Removing Cheaters | 90.11% |  89.95% |     89.19% |
+| After Removing Cheaters  | 57.99% |  53.27% |     58.60% |
+| After Feature Cleanup    | 60.36% |  59.55% | **61.01%** |
