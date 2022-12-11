@@ -35,6 +35,8 @@ COPY baseball.sql .
 COPY BaseballFeatures/feature-extract.sql .
 COPY Docker/run.sh .
 COPY Final/connection-test.py .
+COPY BaseballFeatures/analyze-features.py .
+COPY midterm/* .
 
 # Make directories
 RUN mkdir $APP_HOME/output
