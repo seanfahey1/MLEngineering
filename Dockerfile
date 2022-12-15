@@ -34,7 +34,7 @@ RUN rm -rf /var/lib/apt/lists/*
 COPY baseball.sql .
 COPY BaseballFeatures/feature-extract.sql .
 COPY Docker/run.sh .
-COPY Final/connection-test.py .
+#COPY Final/connection-test.py .
 COPY BaseballFeatures/analyze-features.py .
 COPY midterm/* .
 
