@@ -5,63 +5,21 @@ import sys
 import warnings
 from pathlib import Path
 
+import mariadb
 import numpy as np
 import pandas as pd
 import plotly.express as px
 from plotly.io import to_html
-from pyspark import StorageLevel
-from pyspark.ml.feature import SQLTransformer
-from pyspark.sql import SparkSession
 from sklearn.ensemble import RandomForestClassifier as RFC
 from sklearn.linear_model import SGDClassifier as SGD
 from sklearn.neighbors import KNeighborsClassifier as knn
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
-sys.path.append(str(Path(__file__).parent / "../midterm"))
+# sys.path.append(str(Path(__file__).parent / "../midterm"))
 import midterm  # noqa: E402
 
 warnings.filterwarnings("ignore")
-
-
-def baseballdb_connection(
-    user: str, password: str, jar_path: str, dbtable: str, query: str
-) -> pd.DataFrame:
-    app_name = "baseball mariadb spark"
-    master = "local"
-    jdbc_url = "jdbc:mysql://localhost:3306/baseballdb?permitMysqlScheme"
-    jdbc_driver = "org.mariadb.jdbc.Driver"
-
-    # initialize spark and set logging level to suppress warnings
-    spark = (
-        SparkSession.builder.config("spark.jars", jar_path)
-        .appName(app_name)
-        .master(master)
-        .getOrCreate()
-    )
-    spark.sparkContext.setLogLevel("FATAL")
-
-    table = (
-        spark.read.format("jdbc")
-        .option("url", jdbc_url)
-        .option("driver", jdbc_driver)
-        .option("user", user)
-        .option("password", password)
-        .option("dbtable", dbtable)
-        .load()
-    )
-
-    table.createOrReplaceTempView("game_features_pyspark")
-    table.persist(StorageLevel.DISK_ONLY)
-
-    df = SQLTransformer().setStatement(query)
-    # df.transform(game_features).show()
-    df = df.transform(table).select("*").toPandas()
-
-    with open(Path(__file__).parent / "local_copy.p", "wb") as file:
-        p.dump(df, file)
-
-    return df
 
 
 def cat_v_cat_predictor_correlations(
@@ -491,7 +449,7 @@ def predictor_v_response_correlations(
         )
 
 
-def main(load_from_disk=False):
+def main(load_from_disk=True):
     # setup output directory
     cwd = Path(__file__).parent.resolve()
     output_dir = cwd / "output"
@@ -501,15 +459,29 @@ def main(load_from_disk=False):
         print("Found file locally. Loading file from disk.")
         with open(Path(__file__).parent / "local_copy.p", "rb") as file:
             df = p.load(file)
+
     else:
-        jar_path = (
-            "/Users/sean/workspace/Sean/sdsu/BDA602/DBs/mariadb-java-client-3.0.8.jar"
-        )
-        user = "sean"
-        dbtable = "baseballdb.game_features_2"
-        query = "select * from game_features_pyspark;"
-        password = input("enter password...\t")  # pragma: allowlist secret
-        df = baseballdb_connection(user, password, jar_path, dbtable, query)
+        user = "root"
+        password = "fahey"  # pragma: allowlist secret
+        database = "baseballdb"
+        host = "db"
+
+        sql = """
+        select
+            *
+        from game_features_3
+        """
+
+        try:
+            conn = mariadb.connect(
+                user=user, password=password, host=host, database=database
+            )
+
+        except mariadb.Error as e:
+            print(f"Error connecting to MariaDB Platform: {e}")
+            sys.exit(1)
+
+        df = pd.read_sql(sql, conn)
 
     print("Cleaning up DataFrame")
     convert_to_floats = [
@@ -545,6 +517,8 @@ def main(load_from_disk=False):
         "team_BB_diff",
         "team_DP_diff",
         "team_TP_diff",
+        "days_off_diff",
+        "home_negative_odds",
     ]
     convert_to_string = ["home_throwinghand", "away_throwinghand"]
 
@@ -573,13 +547,12 @@ def main(load_from_disk=False):
         "pitcher_100_SO_diff",
         "pitcher_100_HBP_diff",
         "pitcher_100_num_games_diff",
-        # "home_team_streak",  # this is cheating, apparently it's taking the calc after game finishes :(
-        # "away_team_streak",  # this is cheating, apparently it's taking the calc after game finishes :(
+        # "home_team_streak",
+        # "away_team_streak",
         "home_pitcher_W_L_diff",
         "away_pitcher_W_L_diff",
         "pitcher_win_diff",
         "pitcher_loss_diff",
-        # I think these are cheating somehow. Looks like pregame detail table actually is calculated post-game
         # "pitcher_season_hit_diff",
         # "pitcher_season_runs_diff",
         # "pitcher_season_error_diff",
@@ -595,6 +568,8 @@ def main(load_from_disk=False):
         "team_BB_diff",
         "team_DP_diff",
         "team_TP_diff",
+        "days_off_diff",
+        "home_negative_odds",
     ]
     response = "home_team_wins"
 
@@ -656,6 +631,8 @@ def main(load_from_disk=False):
     df = df.dropna(axis=0)
     train_mask = df.year != 2011
 
+    prediction_df = pd.DataFrame(columns=["Model", "Accuracy"])
+
     X = df[continuous_predictors][train_mask]
     y = df["home_team_wins"][train_mask]
     X_test = df[continuous_predictors][~train_mask]
@@ -678,6 +655,10 @@ def main(load_from_disk=False):
 
     print(f"\t# correct:\t{score}/{len(predictions)}")
     print(f"\taccuracy:\t{round(score / len(predictions), 4) * 100}%\n\n")
+    prediction_df.loc[len(prediction_df)] = [
+        "Random Forest",
+        round(score / len(predictions), 4),
+    ]
 
     print("--- SGD PREDICTION ---")
     sgd_pipeline = Pipeline(
@@ -696,6 +677,7 @@ def main(load_from_disk=False):
 
     print(f"\t# correct:\t{score}/{len(predictions)}")
     print(f"\taccuracy:\t{round(score / len(predictions), 4) * 100}%\n\n")
+    prediction_df.loc[len(prediction_df)] = ["SGD", round(score / len(predictions), 4)]
 
     print("--- KNN PREDICTION ---")
     knn_pipeline = Pipeline(
@@ -714,8 +696,9 @@ def main(load_from_disk=False):
 
     print(f"\t# correct:\t{score}/{len(predictions)}")
     print(f"\taccuracy:\t{round(score / len(predictions), 4) * 100}%\n\n")
+    prediction_df.loc[len(prediction_df)] = ["KNN", round(score / len(predictions), 4)]
 
-    # both RF and SGD did about the same. KNN is a bit worse around 56%.
+    prediction_df.to_csv("predictions-output.csv", index=False, header=True)
 
 
 if __name__ == "__main__":
